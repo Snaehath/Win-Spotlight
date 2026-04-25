@@ -1,0 +1,344 @@
+:root {
+  /* Colors */
+  --bg-primary: rgba(15, 23, 42, 0.98);
+  --bg-secondary: #1e293b;
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+  
+  --text-main: #f8fafc;
+  --text-dim: #94a3b8;
+  --text-muted: rgba(148, 163, 184, 0.4);
+  
+  --border-light: rgba(255, 255, 255, 0.1);
+  --border-ultra-light: rgba(255, 255, 255, 0.03);
+  
+  /* Effects */
+  --blur-main: 32px;
+  --blur-dialog: 12px;
+  --shadow-main: 0 30px 60px rgba(0, 0, 0, 0.6);
+  --shadow-dialog: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  
+  /* Layout */
+  --radius-main: 16px;
+  --container-width: 680px;
+  --container-height: 480px;
+  
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 16px; 
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--text-main);
+  background-color: transparent;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: transparent !important; /* Forces transparency to prevent white corner bleed */
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; 
+  padding-top: 40px; /* Buffer to prevent OS window edge artifacts */
+}
+
+.container {
+  width: var(--container-width);
+  height: var(--container-height);
+  position: relative; /* Context for absolute overlays */
+  
+  background: var(--bg-primary);
+  backdrop-filter: blur(var(--blur-main));
+  border: 1px solid var(--border-light); 
+  border-radius: var(--radius-main); 
+  box-shadow: var(--shadow-main);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Clips content to rounded corners */
+}
+
+.search-box {
+  padding: 1.2rem 1.4rem;
+  border-bottom: 1px solid var(--border-ultra-light);
+}
+
+.search-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.search-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--text-dim);
+  stroke-width: 2.5px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+#search-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-main);
+  font-size: 1.5rem;
+  font-weight: 500;
+  padding: 0;
+}
+
+.app-icon.lucide-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-primary);
+}
+
+.app-icon.lucide-wrapper svg {
+  width: 20px;
+  height: 20px;
+}
+
+.app-icon.placeholder {
+  color: var(--text-muted);
+}
+
+#search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.results {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  flex: 1; /* Allow results to fill the remaining space */
+}
+
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0.8rem 1.4rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-left: 3px solid transparent;
+  
+  /* Staggered entrance */
+  opacity: 0;
+  transform: translateX(-10px);
+  animation: slideIn 0.3s ease-out forwards;
+  animation-delay: calc(var(--item-index) * 0.03s);
+}
+
+@keyframes slideIn {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.result-item:hover, .result-item.selected {
+  background: rgba(255, 255, 255, 0.05);
+  border-left-color: var(--accent-primary);
+}
+
+.result-item.selected {
+  background: rgba(59, 130, 246, 0.1);
+  box-shadow: inset 0 0 20px rgba(59, 130, 246, 0.05);
+}
+
+.app-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+
+.app-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+  flex: 1;
+}
+
+.category-header {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(148, 163, 184, 0.5);
+  padding: 8px 20px 6px 20px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+}
+
+/* Remove border-top from the very first header to keep it clean */
+.category-header:first-child {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 4px;
+  padding-bottom: 6px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.app-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #f8fafc;
+}
+
+.app-path {
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-item.selected .app-path {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Custom Scrollbar */
+.results::-webkit-scrollbar {
+  width: 6px;
+}
+
+.results::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.result-item {
+  animation: fadeIn 0.1s ease-out forwards;
+}
+
+/* ── Dialog Styles ────────────────────────────────────────────────────────── */
+
+.dialog-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(var(--blur-dialog));
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  transition: all 0.3s ease;
+}
+
+.dialog-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.dialog-box {
+  background: var(--bg-secondary);
+  padding: 32px;
+  border-radius: var(--radius-main);
+  width: 320px;
+  text-align: center;
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-dialog);
+  transform: scale(1);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dialog-overlay.hidden .dialog-box {
+  transform: scale(0.9);
+}
+
+@keyframes dialogScale {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.dialog-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.dialog-box h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.dialog-box p {
+  margin: 0 0 24px 0;
+  font-size: 0.95rem;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-primary, .btn-secondary {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #3b82f6;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+}
+

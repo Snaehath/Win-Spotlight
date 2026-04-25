@@ -1,0 +1,16 @@
+{
+  "name": "spotlight-win",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-global-shortcut": "^2.3.1"
+  }
+}

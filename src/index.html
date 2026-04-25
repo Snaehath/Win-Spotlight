@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spotlight</title>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="search-box">
+        <div class="search-input-wrapper">
+          <i data-lucide="search" class="search-icon"></i>
+          <input id="search-input" type="text" placeholder="Search..." autofocus autocomplete="off" />
+        </div>
+      </div>
+      <ul id="results-list" class="results"></ul>
+
+      <!-- Custom Confirmation Dialog (Moved inside container for proper absolute positioning) -->
+      <div id="confirm-dialog" class="dialog-overlay hidden">
+        <div class="dialog-box">
+          <div class="dialog-icon">⚠️</div>
+          <h3 id="dialog-title">Confirmation</h3>
+          <p id="dialog-message">Are you sure you want to proceed?</p>
+          <div class="dialog-actions">
+            <button id="dialog-cancel" class="btn-secondary">Cancel</button>
+            <button id="dialog-ok" class="btn-primary">Proceed</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,195 @@
+import { sortByPriority } from './utils.js';
+import { showConfirm } from './dialog.js';
+import { renderResults, updateSelection } from './ui.js';
+
+const { invoke } = window.__TAURI__.core;
+
+let searchInput;
+let resultsList;
+let selectedIndex = -1;
+let currentResults = [];
+let currentMode = "SEARCH"; // "SEARCH" or "NAMING"
+let pendingShortcutUrl = "";
+
+window.addEventListener("DOMContentLoaded", () => {
+  // Initialize Lucide icons
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+
+  searchInput = document.querySelector("#search-input");
+  resultsList = document.querySelector("#results-list");
+
+  // ── Debounced Search ──────────────────────────────────────────────────────
+  let searchTimeout;
+  searchInput.addEventListener("input", () => {
+    if (currentMode === "NAMING") return; // Don't search while naming
+
+    const query = searchInput.value;
+    if (searchTimeout) clearTimeout(searchTimeout);
+    const delay = query.startsWith('>') ? 250 : 50;
+
+    searchTimeout = setTimeout(async () => {
+      const res = await invoke("search_items", { query });
+      currentResults = sortByPriority(res);
+      selectedIndex = -1;
+      render();
+    }, delay);
+  });
+
+  // ── Keyboard navigation ──────────────────────────────────────────────────
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      selectedIndex = Math.min(selectedIndex + 1, currentResults.length - 1);
+      updateSelection(resultsList, selectedIndex);
+      e.preventDefault();
+    } else if (e.key === "ArrowUp") {
+      selectedIndex = Math.max(selectedIndex - 1, 0);
+      updateSelection(resultsList, selectedIndex);
+      e.preventDefault();
+    } else if (e.key === "Enter") {
+      if (currentMode === "NAMING") {
+        saveShortcutAndReset();
+        return;
+      }
+      let targetIndex = selectedIndex;
+      if (targetIndex === -1 && currentResults.length > 0) targetIndex = 0;
+
+      if (targetIndex >= 0 && targetIndex < currentResults.length) {
+        const item = currentResults[targetIndex];
+        if (item.path) launchSelected(item.path);
+      }
+    } else if (e.key === "Escape") {
+      invoke("hide_window");
+    }
+  });
+
+  // ── Initial results ────────
+  invoke("search_items", { query: "" }).then(res => {
+    currentResults = sortByPriority(res);
+    render();
+  });
+
+  // ── Auto-hide on blur ────────────────────────────────────────────────────
+  window.addEventListener("blur", () => invoke("hide_window"));
+
+  // ── Auto-clear and focus on window show ──────────────────────────────────
+  if (window.__TAURI__ && window.__TAURI__.event) {
+    window.__TAURI__.event.listen("window-shown", () => {
+      searchInput.value = "";
+      searchInput.focus();
+      invoke("search_items", { query: "" }).then(res => {
+        currentResults = sortByPriority(res);
+        selectedIndex = -1;
+        render();
+      });
+    });
+  }
+});
+
+function render() {
+  renderResults(resultsList, currentResults, selectedIndex, launchSelected);
+  // Re-run Lucide to replace <i> with SVGs
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+}
+
+// ── Launch Logic ─────────────────────────────────────────────────────────────
+
+async function launchSelected(path) {
+  if (!path) return;
+  const lowerPath = path.toLowerCase();
+
+  // ── Shortcut Creation Flow ────────────────────────────────────────────────
+  if (path.startsWith("CREATE_SHORTCUT:")) {
+    pendingShortcutUrl = path.replace("CREATE_SHORTCUT:", "");
+    currentMode = "NAMING";
+    searchInput.value = "";
+    searchInput.placeholder = "Enter alias name (e.g. 'yt')...";
+    currentResults = [];
+    render();
+    return;
+  }
+
+  if (path === "CLEAR_SHORTCUTS") {
+    const confirmed = await showConfirm(
+      "Clear All Shortcuts?",
+      "This will permanently delete all your saved web aliases. Are you sure?",
+      searchInput
+    );
+    if (confirmed) {
+      await invoke("clear_shortcuts");
+      // Refresh recents
+      const res = await invoke("search_items", { query: "" });
+      currentResults = sortByPriority(res);
+      render();
+    }
+    return;
+  }
+
+  // ── Browser Confirmation ──
+  if (lowerPath.startsWith("command:> g") || lowerPath.includes("http://") || lowerPath.includes("https://")) {
+    const confirmed = await showConfirm(
+      "Open Browser?",
+      "This will open your default web browser to perform a search or follow a link.",
+      searchInput
+    );
+    if (!confirmed) return;
+  }
+
+  // ── System Actions Confirmation ──
+  if (lowerPath.startsWith("command:> sys")) {
+    const parts = path.split(" ");
+    const actionLabels = {
+      "shutdown": "Shut Down PC",
+      "restart": "Restart PC",
+      "sleep": "Sleep PC",
+      "lock": "Lock Screen",
+      "exit": "Exit Spotlight",
+      "quit": "Exit Spotlight"
+    };
+
+    const action = parts[parts.length - 1].toLowerCase();
+    const isExit = action === "exit" || action === "quit";
+    
+    const confirmed = await showConfirm(
+      actionLabels[action] || "System Action",
+      isExit 
+        ? "Are you sure you want to close the app?" 
+        : `Are you sure you want to ${action} the computer now?`,
+      searchInput
+    );
+    if (!confirmed) return;
+  }
+
+  try {
+    const shouldHide = await invoke("launch_app", { path });
+    if (shouldHide) {
+      await invoke("hide_window");
+      searchInput.value = "";
+      selectedIndex = -1;
+    }
+  } catch (err) {
+    console.error("Launch error:", err);
+  }
+}
+
+async function saveShortcutAndReset() {
+  const alias = searchInput.value.trim();
+  if (alias && pendingShortcutUrl) {
+    await invoke("save_shortcut", { alias, url: pendingShortcutUrl });
+    
+    // Reset UI
+    currentMode = "SEARCH";
+    searchInput.placeholder = "Search...";
+    searchInput.value = "";
+    pendingShortcutUrl = "";
+    
+    // Refresh to show newly added shortcut if it matches empty query (recents)
+    const res = await invoke("search_items", { query: "" });
+    currentResults = sortByPriority(res);
+    render();
+  }
+}
+
