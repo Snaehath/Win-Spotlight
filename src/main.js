@@ -1,6 +1,6 @@
-import { sortByPriority } from './utils.js';
-import { showConfirm } from './dialog.js';
-import { renderResults, updateSelection } from './ui.js';
+import { sortByPriority } from "./utils.js";
+import { showConfirm } from "./dialog.js";
+import { renderResults, updateSelection } from "./ui.js";
 
 const { invoke } = window.__TAURI__.core;
 
@@ -27,7 +27,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     const query = searchInput.value;
     if (searchTimeout) clearTimeout(searchTimeout);
-    const delay = query.startsWith('>') ? 250 : 50;
+    const delay = query.startsWith(">") ? 250 : 50;
 
     searchTimeout = setTimeout(async () => {
       const res = await invoke("search_items", { query });
@@ -38,8 +38,20 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   // ── Keyboard navigation ──────────────────────────────────────────────────
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowDown") {
+  window.addEventListener("keydown", async (e) => {
+    if (e.key === "Delete" && e.altKey) {
+      e.preventDefault();
+      let targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
+      const item = currentResults[targetIndex];
+      if (item && item.path) {
+        await invoke("remove_from_history", { path: item.path });
+
+        const res = await invoke("search_items", { query: searchInput.value });
+        currentResults = sortByPriority(res);
+        selectedIndex = Math.max(selectedIndex - 1, 0);
+        render();
+      }
+    } else if (e.key === "ArrowDown") {
       selectedIndex = Math.min(selectedIndex + 1, currentResults.length - 1);
       updateSelection(resultsList, selectedIndex);
       e.preventDefault();
@@ -48,16 +60,17 @@ window.addEventListener("DOMContentLoaded", () => {
       updateSelection(resultsList, selectedIndex);
       e.preventDefault();
     } else if (e.key === "Enter") {
+      let targetIndex = selectedIndex;
+      if (targetIndex === -1 && currentResults.length > 0) targetIndex = 0;
+
       if (currentMode === "NAMING") {
         saveShortcutAndReset();
         return;
       }
-      let targetIndex = selectedIndex;
-      if (targetIndex === -1 && currentResults.length > 0) targetIndex = 0;
 
       if (targetIndex >= 0 && targetIndex < currentResults.length) {
         const item = currentResults[targetIndex];
-        if (item.path) launchSelected(item.path);
+        if (item.path) launchSelected(item.path, e);
       }
     } else if (e.key === "Escape") {
       invoke("hide_window");
@@ -65,7 +78,7 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   // ── Initial results ────────
-  invoke("search_items", { query: "" }).then(res => {
+  invoke("search_items", { query: "" }).then((res) => {
     currentResults = sortByPriority(res);
     render();
   });
@@ -78,7 +91,7 @@ window.addEventListener("DOMContentLoaded", () => {
     window.__TAURI__.event.listen("window-shown", () => {
       searchInput.value = "";
       searchInput.focus();
-      invoke("search_items", { query: "" }).then(res => {
+      invoke("search_items", { query: "" }).then((res) => {
         currentResults = sortByPriority(res);
         selectedIndex = -1;
         render();
@@ -97,8 +110,13 @@ function render() {
 
 // ── Launch Logic ─────────────────────────────────────────────────────────────
 
-async function launchSelected(path) {
+async function launchSelected(path, e) {
   if (!path) return;
+
+  if (e && e.shiftKey && !path.startsWith("COMMAND:")) {
+    revealSelected(path);
+    return;
+  }
   const lowerPath = path.toLowerCase();
 
   // ── Shortcut Creation Flow ────────────────────────────────────────────────
@@ -116,7 +134,7 @@ async function launchSelected(path) {
     const confirmed = await showConfirm(
       "Clear All Shortcuts?",
       "This will permanently delete all your saved web aliases. Are you sure?",
-      searchInput
+      searchInput,
     );
     if (confirmed) {
       await invoke("clear_shortcuts");
@@ -129,11 +147,15 @@ async function launchSelected(path) {
   }
 
   // ── Browser Confirmation ──
-  if (lowerPath.startsWith("command:> g") || lowerPath.includes("http://") || lowerPath.includes("https://")) {
+  if (
+    lowerPath.startsWith("command:> g") ||
+    lowerPath.includes("http://") ||
+    lowerPath.includes("https://")
+  ) {
     const confirmed = await showConfirm(
       "Open Browser?",
       "This will open your default web browser to perform a search or follow a link.",
-      searchInput
+      searchInput,
     );
     if (!confirmed) return;
   }
@@ -142,23 +164,23 @@ async function launchSelected(path) {
   if (lowerPath.startsWith("command:> sys")) {
     const parts = path.split(" ");
     const actionLabels = {
-      "shutdown": "Shut Down PC",
-      "restart": "Restart PC",
-      "sleep": "Sleep PC",
-      "lock": "Lock Screen",
-      "exit": "Exit Spotlight",
-      "quit": "Exit Spotlight"
+      shutdown: "Shut Down PC",
+      restart: "Restart PC",
+      sleep: "Sleep PC",
+      lock: "Lock Screen",
+      exit: "Exit Spotlight",
+      quit: "Exit Spotlight",
     };
 
     const action = parts[parts.length - 1].toLowerCase();
     const isExit = action === "exit" || action === "quit";
-    
+
     const confirmed = await showConfirm(
       actionLabels[action] || "System Action",
-      isExit 
-        ? "Are you sure you want to close the app?" 
+      isExit
+        ? "Are you sure you want to close the app?"
         : `Are you sure you want to ${action} the computer now?`,
-      searchInput
+      searchInput,
     );
     if (!confirmed) return;
   }
@@ -179,13 +201,13 @@ async function saveShortcutAndReset() {
   const alias = searchInput.value.trim();
   if (alias && pendingShortcutUrl) {
     await invoke("save_shortcut", { alias, url: pendingShortcutUrl });
-    
+
     // Reset UI
     currentMode = "SEARCH";
     searchInput.placeholder = "Search...";
     searchInput.value = "";
     pendingShortcutUrl = "";
-    
+
     // Refresh to show newly added shortcut if it matches empty query (recents)
     const res = await invoke("search_items", { query: "" });
     currentResults = sortByPriority(res);
@@ -193,3 +215,8 @@ async function saveShortcutAndReset() {
   }
 }
 
+async function revealSelected(path) {
+  if (!path || path.startsWith("COMMAND:")) return;
+  await invoke("reveal_in_explorer", { path });
+  await invoke("hide_window");
+}

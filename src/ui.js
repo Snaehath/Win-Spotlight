@@ -53,7 +53,7 @@ export function renderResults(resultsList, currentResults, selectedIndex, onLaun
     `;
 
     if (item.path) {
-      li.onclick = () => onLaunch(item.path);
+      li.onclick = (e) => onLaunch(item.path, e);
     }
 
     resultsList.appendChild(li);
