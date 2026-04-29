@@ -144,6 +144,8 @@ fn process_event(
     icon_cache: &IconCache,
 ) {
     let path = &evt.path;
+    let path_str = path.to_string_lossy().to_string();
+
     match evt.kind {
         DebouncedEventKind::Any => {
             if path.exists() {
@@ -151,14 +153,15 @@ fn process_event(
                     let _ = engine.upsert(&item);
                     let _ = engine.commit();
                     let mut lock = cache.lock().unwrap();
-                    lock.retain(|i| i.path != item.path);
+                    // Case-insensitive removal from cache to prevent duplicates
+                    lock.retain(|i| !i.path.eq_ignore_ascii_case(&item.path));
                     lock.push(item);
                 }
             } else {
-                let path_str = path.to_string_lossy().to_string();
                 let _ = engine.remove_by_path(&path_str);
                 let mut lock = cache.lock().unwrap();
-                lock.retain(|i| i.path != path_str);
+                // Case-insensitive removal on deletion
+                lock.retain(|i| !i.path.eq_ignore_ascii_case(&path_str));
             }
         }
         _ => {}

@@ -15,7 +15,7 @@ mod currency;
 use std::sync::{Arc, Mutex};
 use indexer::scan_items;
 use search::{search_items, AppCache, IndexState, CommandState};
-use launcher::launch_app;
+use launcher::{launch_app, reveal_in_explorer};
 use history::HistoryManager;
 use commands::CommandRegistry;
 use index_engine::IndexEngine;
@@ -24,6 +24,8 @@ use shortcuts::{ShortcutManager, save_shortcut, clear_shortcuts};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, Modifiers, Code, ShortcutState};
 use tauri_plugin_autostart::ManagerExt;
 use tauri::{AppHandle, Manager, Emitter};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use windows::Win32::Storage::FileSystem::GetLogicalDrives;
 
 #[tauri::command]
@@ -44,6 +46,11 @@ fn hide_window(app_handle: AppHandle) {
     if let Some(window) = app_handle.get_webview_window("main") {
         window.hide().unwrap();
     }
+}
+
+#[tauri::command]
+fn remove_from_history(path: String, history_manager: tauri::State<'_, HistoryManager>) {
+    history_manager.remove_entry(&path);
 }
 
 fn get_drive_roots() -> Vec<String> {
@@ -134,6 +141,36 @@ fn main() {
                 );
             }
 
+            // ── System Tray ──────────────────────────────────────────────────
+            let show_i = MenuItem::with_id(app, "show", "Show Spotlight", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let about_1 = MenuItem::with_id(app, "about", "About Spotlight", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &about_1, &quit_i])?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "show" => {
+                            toggle_window(app.clone());
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        "about" => {
+                            println!("Spotlight-Win v0.4.0")
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|app, event| {
+                    if let TrayIconEvent::Click { .. } = event {
+                        toggle_window(app.app_handle().clone());
+                    }
+                })
+                .build(app)?;
+
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
@@ -159,6 +196,8 @@ fn main() {
             hide_window,
             save_shortcut,
             clear_shortcuts,
+            remove_from_history,
+            reveal_in_explorer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

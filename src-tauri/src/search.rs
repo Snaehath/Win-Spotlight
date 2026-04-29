@@ -57,7 +57,10 @@ pub fn search_items(
         let history = history_manager.load();
         let mut recents: Vec<SearchResult> = Vec::new();
 
-        for record in history.records.iter().take(5) {
+        // Filter valid items first, then take 5
+        for record in history.records.iter() {
+            if recents.len() >= 5 { break; }
+
             let item = if record.path.starts_with("COMMAND:") {
                 // Synthetic command item
                 let name = if record.path.contains("> health") { "System Health" } 
@@ -127,6 +130,8 @@ pub fn search_items(
     let mut recents: Vec<SearchResult> = Vec::new();
 
     for record in history.records {
+        if recents.len() >= 5 { break; }
+
         let item = if record.path.starts_with("COMMAND:") {
             // Synthetic command item
             let name = if record.path.contains("> health") { "System Health" } 

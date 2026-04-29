@@ -8,6 +8,8 @@ use chrono::{Local, Timelike};
 pub struct LaunchRecord {
     pub path: String,
     pub count: u32,
+    #[serde(default)]
+    pub last_launched: u64,
     pub hourly_distribution: [u32; 24], // Count of launches per hour (0-23)
 }
 
@@ -62,24 +64,29 @@ impl HistoryManager {
 
     pub fn record_launch(&self, item_path: String) {
         let mut history = self.load();
+        let now = Local::now().timestamp() as u64;
         let hour = Local::now().hour() as usize;
 
         if let Some(record) = history.records.iter_mut().find(|r| r.path == item_path) {
             record.count += 1;
+            record.last_launched = now;
             record.hourly_distribution[hour] += 1;
         } else {
             let mut record = LaunchRecord {
                 path: item_path,
                 count: 1,
+                last_launched: now,
                 hourly_distribution: [0; 24],
             };
             record.hourly_distribution[hour] = 1;
             history.records.push(record);
         }
 
-        // Prune old history if it gets too large (e.g. keep top 100 apps)
+        // Sort by recency (newest first)
+        history.records.sort_by(|a, b| b.last_launched.cmp(&a.last_launched));
+
+        // Prune old history if it gets too large (keep top 100)
         if history.records.len() > 100 {
-            history.records.sort_by(|a, b| b.count.cmp(&a.count));
             history.records.truncate(100);
         }
 
@@ -108,5 +115,21 @@ impl HistoryManager {
         } else {
             0.0
         }
+    }
+
+    pub fn remove_entry(&self, item_path: &str) {
+        let mut history = self.load();
+        history.records.retain(|r| r.path != item_path);
+        self.save(&history);
+    }
+
+    pub fn clear_web_history(&self) {
+        let mut history = self.load();
+        // Remove all entries that start with COMMAND: and look like URLs
+        // We keep other commands like sys or calc if desired, but here we purge web-related ones.
+        history.records.retain(|r| {
+            !(r.path.starts_with("COMMAND:http") || r.path.starts_with("COMMAND:www."))
+        });
+        self.save(&history);
     }
 }

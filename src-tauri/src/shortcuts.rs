@@ -60,6 +60,10 @@ pub fn save_shortcut(alias: String, url: String, manager: tauri::State<'_, Short
 }
 
 #[tauri::command]
-pub fn clear_shortcuts(manager: tauri::State<'_, ShortcutManager>) {
+pub fn clear_shortcuts(
+    manager: tauri::State<'_, ShortcutManager>,
+    history_manager: tauri::State<'_, crate::history::HistoryManager>
+) {
     manager.clear();
+    history_manager.clear_web_history();
 }

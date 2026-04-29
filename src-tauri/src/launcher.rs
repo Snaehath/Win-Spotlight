@@ -71,3 +71,19 @@ pub fn launch_app(
 
     Ok(true) // Hide window
 }
+
+#[tauri::command]
+pub fn reveal_in_explorer(path: String) -> Result<(), String> {
+    if !std::path::Path::new(&path).exists() {
+        return Err("File does not exist".to_string());
+    }
+
+    // explorer.exe /select,"path" highlights the file in its folder
+    std::process::Command::new("explorer.exe")
+        .args(["/select,", &path])
+        .creation_flags(0x08000000)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
