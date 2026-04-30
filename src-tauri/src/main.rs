@@ -27,6 +27,23 @@ use tauri::{AppHandle, Manager, Emitter};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use windows::Win32::Storage::FileSystem::GetLogicalDrives;
+use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
+use windows::core::PCWSTR;
+
+fn show_error_and_exit(title: &str, message: &str) -> ! {
+    let title_u16: Vec<u16> = title.encode_utf16().chain(Some(0)).collect();
+    let message_u16: Vec<u16> = message.encode_utf16().chain(Some(0)).collect();
+
+    unsafe {
+        let _ = MessageBoxW(
+            None,
+            PCWSTR(message_u16.as_ptr()),
+            PCWSTR(title_u16.as_ptr()),
+            MB_OK | MB_ICONERROR,
+        );
+    }
+    std::process::exit(1);
+}
 
 #[tauri::command]
 fn toggle_window(app_handle: AppHandle) {
@@ -75,8 +92,11 @@ fn main() {
 
             // ── Global shortcut: Ctrl + Space ────────────────────────────────
             let ctrl_space = Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
-            if let Err(e) = app.global_shortcut().register(ctrl_space) {
-                eprintln!("Failed to register Ctrl+Space: {}", e);
+            if let Err(_e) = app.global_shortcut().register(ctrl_space) {
+               show_error_and_exit(
+                "Shortcut Conflict",
+                "The Ctrl+Space shortcut is already in use. Please close any other instances of Spotlight-Win"
+               ) 
             }
 
             // ── History ──────────────────────────────────────────────────────
@@ -91,9 +111,14 @@ fn main() {
             let mut index_dir = app.path().app_data_dir()
                 .unwrap_or_else(|_| std::path::PathBuf::from("."));
             index_dir.push("spotlight_index");
-            let engine = Arc::new(
-                IndexEngine::open(&index_dir).expect("Failed to open Tantivy index")
-            );
+            let engine_result = IndexEngine::open(&index_dir);
+            let engine = match engine_result {
+                Ok(e) => Arc::new(e),
+                Err(_e) => show_error_and_exit(
+                    "Search Engine Error",
+                    "Failed to open the search index,  This usually means another instance of the app is already running."
+                )
+            };
 
             // ── Icon Cache ──────────────────────────────────────────────────
             let icon_cache = Arc::new(indexer::IconCache::new(app.handle()));

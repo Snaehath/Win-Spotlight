@@ -49,19 +49,65 @@ pub fn search_items(
         return handle_command(query_trimmed, &cmd_state.0);
     }
 
+    // ── 1.1 Handle Keyword Filtering (e.g. app:, file:, folder:) ───────────
+    let mut forced_category: Option<&str> = None;
+    let mut forced_item_type: Option<crate::indexer::ItemType> = None;
+    let mut actual_query = query_trimmed;
+
+    if query_trimmed.starts_with("app:") {
+        forced_category = Some("APP");
+        actual_query = query_trimmed["app:".len()..].trim();
+    } else if query_trimmed.starts_with("file:") {
+        forced_item_type = Some(crate::indexer::ItemType::File);
+        actual_query = query_trimmed["file:".len()..].trim();
+    } else if query_trimmed.starts_with("folder:") {
+        forced_item_type = Some(crate::indexer::ItemType::Folder);
+        actual_query = query_trimmed["folder:".len()..].trim();
+    } else if query_trimmed.starts_with("command:") {
+        forced_category = Some("COMMAND");
+        actual_query = query_trimmed["command:".len()..].trim();
+    }
+
     let items = state.apps.lock().unwrap();
     let matcher = SkimMatcherV2::default();
 
-    // ── 2. Empty query: show only recents ───────────────────────────────────
-    if query_trimmed.is_empty() {
+    // ── 2. Empty query: show filter suggestions + recents ──────────────────
+    // Note: We skip this early return if the `command:` filter is active, 
+    // so we can show the full command list even with an empty query.
+    if actual_query.is_empty() && forced_category != Some("COMMAND") {
         let history = history_manager.load();
-        let mut recents: Vec<SearchResult> = Vec::new();
+        let mut final_results: Vec<SearchResult> = Vec::new();
 
-        // Filter valid items first, then take 5
+        // ── 2a. Inject Filter Suggestions ────────────────────────────────────
+        // Only show these if no specific filter is already active
+        if forced_category.is_none() && forced_item_type.is_none() {
+            let suggestions = vec![
+                ("app:", "Search Apps", "monitor"),
+                ("file:", "Search Files", "file-text"),
+                ("folder:", "Search Folders", "folder"),
+                ("command:", "Search Commands", "terminal"),
+            ];
+
+            for (prefix, label, icon) in suggestions {
+                final_results.push(SearchResult::from(SearchItem {
+                    name: label.to_string(),
+                    path: prefix.to_string(),
+                    icon: Some(icon.to_string()),
+                    item_type: crate::indexer::ItemType::File,
+                    category: "FILTER".to_string(), // New category for special styling
+                }));
+            }
+        }
+
+        // ── 2b. Add Recents ──────────────────────────────────────────────────
+        let mut recents_count = 0;
         for record in history.records.iter() {
-            if recents.len() >= 5 { break; }
+            if recents_count >= 5 { break; }
 
             let item = if record.path.starts_with("COMMAND:") {
+                // Commands are generally not filtered by keywords
+                if forced_category.is_some() || forced_item_type.is_some() { continue; }
+
                 // Synthetic command item
                 let name = if record.path.contains("> health") { "System Health" } 
                           else if record.path.contains("> sys") { "System Action" }
@@ -74,27 +120,45 @@ pub fn search_items(
                     category: "RECENT".to_string(),
                 })
             } else {
-                items.iter().find(|i| i.path == record.path).map(|cached| {
+                items.iter().find(|i| i.path == record.path).and_then(|cached| {
+                    // Apply filtering to recents too!
+                    if let Some(cat) = forced_category {
+                        if cached.category != cat { return None; }
+                    }
+                    if let Some(ref itype) = forced_item_type {
+                        if cached.item_type != *itype { return None; }
+                    }
+                    
                     let mut recent_item = cached.clone();
                     recent_item.category = "RECENT".to_string();
-                    recent_item
+                    Some(recent_item)
                 })
             };
 
             if let Some(res_item) = item {
-                recents.push(SearchResult::from(res_item));
+                final_results.push(SearchResult::from(res_item));
+                recents_count += 1;
             }
         }
 
-        return recents;
+        return final_results;
     }
 
     // ── 3. Fuzzy search via in-memory cache ─────────────────────────────────
     let mut scored: Vec<(i64, SearchItem)> = items
         .iter()
+        .filter(|item| {
+            if let Some(cat) = forced_category {
+                if item.category != cat { return false; }
+            }
+            if let Some(ref itype) = forced_item_type {
+                if item.item_type != *itype { return false; }
+            }
+            true
+        })
         .filter_map(|item| {
-            let fuzzy = matcher.fuzzy_match(&item.name, query_trimmed);
-            let acronym = acronym_match(&item.name, query_trimmed);
+            let fuzzy = matcher.fuzzy_match(&item.name, actual_query);
+            let acronym = acronym_match(&item.name, actual_query);
             match (fuzzy, acronym) {
                 (Some(f), Some(a)) => Some((f.max(a), item.clone())),
                 (Some(f), None)    => Some((f, item.clone())),
@@ -180,10 +244,18 @@ pub fn search_items(
 
     let mut file_results: Vec<SearchResult> = final_results.into_iter().take(40).collect();
 
-    // ── 6. Ambient Intent Layer (no prefix required) ─────────────────────────
-    // These are injected AFTER file results so they appear in the COMMAND section.
-    let ambient = detect_ambient_intent(query_trimmed, &shortcut_manager);
-    let mut command_results: Vec<SearchResult> = ambient;
+    // ── 6. Ambient Intent Layer ──────────────────────────────────────────────
+    // We only show these if:
+    // 1. No specific filter is active (Universal Search)
+    // 2. The `command:` filter is explicitly active
+    let is_command_filter = forced_category == Some("COMMAND");
+    let has_other_filter = (forced_category.is_some() && !is_command_filter) || forced_item_type.is_some();
+
+    let mut command_results: Vec<SearchResult> = if has_other_filter {
+        Vec::new()
+    } else {
+        detect_ambient_intent(actual_query, &shortcut_manager, is_command_filter, &matcher)
+    };
 
     // Combine: command suggestions first (pinned at top of COMMAND section)
     command_results.append(&mut file_results);
@@ -193,13 +265,18 @@ pub fn search_items(
 // ── Ambient Intent Detection ──────────────────────────────────────────────────
 // Detects math and system keywords without requiring a `>` prefix.
 
-fn detect_ambient_intent(query: &str, shortcut_manager: &crate::shortcuts::ShortcutManager) -> Vec<SearchResult> {
+fn detect_ambient_intent(
+    query: &str, 
+    shortcut_manager: &crate::shortcuts::ShortcutManager,
+    force_all: bool,
+    matcher: &SkimMatcherV2
+) -> Vec<SearchResult> {
     let mut results = Vec::new();
     let q = query.trim().to_lowercase();
+    let is_empty = q.is_empty();
 
     // ── Math: detect `<number> <op> <number>` patterns ───────────────────────
-    // e.g. "5 + 5", "100 / 4", "12*3"
-    if is_math_expression(query) {
+    if !is_empty && is_math_expression(query) {
         if let Some(result) = eval_simple(query) {
             let formatted = if result.fract() == 0.0 {
                 format!("{}", result as i64)
@@ -233,7 +310,13 @@ fn detect_ambient_intent(query: &str, shortcut_manager: &crate::shortcuts::Short
     ];
 
     for (keyword, label, cmd_path, icon) in sys_actions {
-        if q == *keyword || q.starts_with(keyword) {
+        let is_match = if force_all && is_empty { 
+            true 
+        } else { 
+            q == *keyword || q.starts_with(keyword) || matcher.fuzzy_match(keyword, &q).is_some()
+        };
+        
+        if is_match {
             // Avoid duplicate matches (e.g. "shutdown" and "shut down")
             let already_added = results.iter().any(|r: &SearchResult| r.item.path == *cmd_path);
             if !already_added {
@@ -252,7 +335,13 @@ fn detect_ambient_intent(query: &str, shortcut_manager: &crate::shortcuts::Short
     // ── Custom Web Shortcuts ──────────────────────────────────────────────────
     let shortcuts = shortcut_manager.get_all();
     for (alias, url) in shortcuts {
-        if alias.starts_with(&q) || q.starts_with(&alias) {
+        let is_match = if force_all && is_empty { 
+            true 
+        } else { 
+            alias.starts_with(&q) || q.starts_with(&alias) || matcher.fuzzy_match(&alias, &q).is_some()
+        };
+        
+        if is_match {
             let synthetic = SearchItem {
                 name: alias.clone(),
                 path: format!("COMMAND:{}", url),
@@ -265,35 +354,38 @@ fn detect_ambient_intent(query: &str, shortcut_manager: &crate::shortcuts::Short
     }
 
     // ── URL Detection & "Save Shortcut" ────────────────────────────────────────
-    let common_tlds = [".com", ".org", ".net", ".io", ".gov", ".edu", ".me", ".app", ".dev", ".ai"];
-    let has_web_tld = common_tlds.iter().any(|tld| q.ends_with(tld));
-    let is_web_prefix = q.starts_with("www.") || q.starts_with("http");
-    
-    let is_url = is_web_prefix || (has_web_tld && !q.contains(' '));
+    if !is_empty {
+        let common_tlds = [".com", ".org", ".net", ".io", ".gov", ".edu", ".me", ".app", ".dev", ".ai"];
+        let has_web_tld = common_tlds.iter().any(|tld| q.ends_with(tld));
+        let is_web_prefix = q.starts_with("www.") || q.starts_with("http");
+        
+        let is_url = is_web_prefix || (has_web_tld && !q.contains(' '));
 
-    if is_url {
-        // Option 1: Open
-        let open_path = if q.starts_with("http") { q.to_string() } else { format!("https://{}", q) };
-        results.push(SearchResult::from(SearchItem {
-            name: format!("Open {}", q),
-            path: format!("COMMAND:{}", open_path),
-            icon: Some("globe".to_string()),
-            item_type: crate::indexer::ItemType::File,
-            category: "WEB".to_string(),
-        }));
+        if is_url {
+            // Option 1: Open
+            let open_path = if q.starts_with("http") { q.to_string() } else { format!("https://{}", q) };
+            results.push(SearchResult::from(SearchItem {
+                name: format!("Open {}", q),
+                path: format!("COMMAND:{}", open_path),
+                icon: Some("globe".to_string()),
+                item_type: crate::indexer::ItemType::File,
+                category: "WEB".to_string(),
+            }));
 
-        // Option 2: Save
-        results.push(SearchResult::from(SearchItem {
-            name: format!("Save {} as shortcut...", q),
-            path: format!("CREATE_SHORTCUT:{}", open_path),
-            icon: Some("bookmark".to_string()),
-            item_type: crate::indexer::ItemType::File,
-            category: "WEB".to_string(),
-        }));
+            // Option 2: Save
+            results.push(SearchResult::from(SearchItem {
+                name: format!("Save {} as shortcut...", q),
+                path: format!("CREATE_SHORTCUT:{}", open_path),
+                icon: Some("bookmark".to_string()),
+                item_type: crate::indexer::ItemType::File,
+                category: "WEB".to_string(),
+            }));
+        }
     }
 
     // ── Management: Clear Shortcuts ──────────────────────────────────────────
-    if q == "clear shortcuts" || q == "> clear shortcuts" {
+    let is_clear_match = if force_all && is_empty { true } else { q == "clear shortcuts" || q == "> clear shortcuts" };
+    if is_clear_match {
         results.push(SearchResult::from(SearchItem {
             name: "Wipe all saved shortcuts".to_string(),
             path: "CLEAR_SHORTCUTS".to_string(),
