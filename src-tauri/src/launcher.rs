@@ -52,14 +52,9 @@ pub fn launch_app(
     }
 
     if is_url {
-        // Use PowerShell to open URLs securely. 
-        // We escape single quotes to prevent command injection breakouts.
-        let escaped_path = path.replace("'", "''");
-        Command::new("powershell")
-            .args(["-NoProfile", "-Command", &format!("Start-Process '{}'", escaped_path)])
-            .creation_flags(0x08000000)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        // Use native ShellExecuteW to open URLs securely.
+        // This bypasses the shell (PowerShell/CMD) and is immune to injection.
+        crate::shell::open_path_or_url(&path).map_err(|e| e.to_string())?;
     } else {
         // Launch the item securely via the native default handler
         Command::new("explorer.exe")

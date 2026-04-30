@@ -171,14 +171,9 @@ pub fn execute_command_result(result: CommandResult) -> Result<Option<String>, S
         CommandResult::Error(e) => Err(e),
         CommandResult::Launch(exe, args) => {
             if exe == "https" {
-                // Use PowerShell to open URLs securely.
-                // Escape single quotes to prevent command injection breakouts.
-                let escaped_url = args[0].replace("'", "''");
-                SysCommand::new("powershell")
-                    .args(["-NoProfile", "-Command", &format!("Start-Process '{}'", escaped_url)])
-                    .creation_flags(0x08000000)
-                    .spawn()
-                    .map_err(|e| e.to_string())?;
+                // Use native ShellExecuteW to open URLs securely.
+                // This bypasses the shell (PowerShell/CMD) and is immune to injection.
+                crate::shell::open_path_or_url(&args[0]).map_err(|e| e.to_string())?;
             } else if exe == "exit" {
                 std::process::exit(0);
             } else {

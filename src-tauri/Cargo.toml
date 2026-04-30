@@ -30,7 +30,7 @@ lnk = "0.6"
 encoding_rs = "0.8"
 tauri-plugin-autostart = "2"
 directories = "5"
-windows = { version = "0.62.2", features = ["Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.62.2", features = ["Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell"] }
 tantivy = "0.22.0"
 notify = "6.1.1"
 chrono = "0.4.44"

@@ -11,6 +11,7 @@ mod shortcuts;
 mod index_engine;
 mod watcher;
 mod currency;
+mod shell;
 
 use std::sync::{Arc, Mutex};
 use indexer::scan_items;

@@ -3,6 +3,9 @@ use windows::Win32::Storage::FileSystem::GetLogicalDrives;
 
 pub fn get_active_drives() -> Vec<String> {
     let mut drives = Vec::new();
+    // SAFETY: GetLogicalDrives is a simple Win32 query function that returns 
+    // a bitmask of available drives. It does not dereference raw pointers 
+    // or mutate memory outside of the return value.
     unsafe {
         let mask = GetLogicalDrives();
         for i in 0..26 {
