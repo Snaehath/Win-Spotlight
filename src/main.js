@@ -11,6 +11,13 @@ let currentResults = [];
 let currentMode = "SEARCH"; // "SEARCH" or "NAMING"
 let pendingShortcutUrl = "";
 
+const KEYWORD_MAP = {
+  "app:": "Applications",
+  "folder:": "Folders",
+  "file:": "Files",
+  "command:": "Commands",
+};
+
 window.addEventListener("DOMContentLoaded", () => {
   // Initialize Lucide icons
   if (window.lucide) {
@@ -19,18 +26,39 @@ window.addEventListener("DOMContentLoaded", () => {
 
   searchInput = document.querySelector("#search-input");
   resultsList = document.querySelector("#results-list");
+  const filterTag = document.querySelector("#filter-tag");
+  let activeFilter = null;
 
   // ── Debounced Search ──────────────────────────────────────────────────────
   let searchTimeout;
+
   searchInput.addEventListener("input", () => {
     if (currentMode === "NAMING") return; // Don't search while naming
 
     const query = searchInput.value;
+    const activeKeyword = Object.keys(KEYWORD_MAP).find((key) =>
+      query.startsWith(key),
+    );
+
+    if (activeKeyword) {
+      activeFilter = activeKeyword;
+      filterTag.innerText = KEYWORD_MAP[activeKeyword];
+      filterTag.classList.remove("hidden");
+      searchInput.value = "";
+      searchInput.placeholder = `Search ${KEYWORD_MAP[activeKeyword]}...`;
+    } else if (!activeFilter) {
+      activeFilter = null;
+      filterTag.classList.add("hidden");
+      searchInput.placeholder = "Search...";
+    }
+
     if (searchTimeout) clearTimeout(searchTimeout);
-    const delay = query.startsWith(">") ? 250 : 50;
+    const delay = query.startsWith(">") ? 250 : 150;
 
     searchTimeout = setTimeout(async () => {
-      const res = await invoke("search_items", { query });
+      const currentVal = searchInput.value;
+      const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
+      const res = await invoke("search_items", { query: fullQuery });
       currentResults = sortByPriority(res);
       selectedIndex = -1;
       render();
@@ -58,6 +86,14 @@ window.addEventListener("DOMContentLoaded", () => {
     } else if (e.key === "ArrowUp") {
       selectedIndex = Math.max(selectedIndex - 1, 0);
       updateSelection(resultsList, selectedIndex);
+      e.preventDefault();
+    } else if (
+      e.key === "Backspace" &&
+      searchInput.value === "" &&
+      activeFilter
+    ) {
+      activeFilter = null;
+      filterTag.classList.add("hidden");
       e.preventDefault();
     } else if (e.key === "Enter") {
       let targetIndex = selectedIndex;
@@ -118,6 +154,13 @@ async function launchSelected(path, e) {
     return;
   }
   const lowerPath = path.toLowerCase();
+
+  const item = currentResults[selectedIndex > 0 ? selectedIndex : 0];
+  if (item && item.category === "FILTER") {
+    searchInput.value = path;
+    searchInput.dispatchEvent(new Event("input"));
+    return;
+  }
 
   // ── Shortcut Creation Flow ────────────────────────────────────────────────
   if (path.startsWith("CREATE_SHORTCUT:")) {

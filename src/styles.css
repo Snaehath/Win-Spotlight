@@ -74,8 +74,33 @@ body {
 .search-input-wrapper {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
+}
+
+.filter-tag {
+  display: flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: var(--accent-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: tag-pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  user-select: none;
+  cursor: default;
+}
+
+@keyframes tag-pop {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.filter-tag.hidden {
+  display: none;
 }
 
 .search-icon {
@@ -88,7 +113,7 @@ body {
 }
 
 #search-input {
-  width: 100%;
+  flex: 1;
   background: transparent;
   border: none;
   outline: none;
@@ -96,6 +121,7 @@ body {
   font-size: 1.5rem;
   font-weight: 500;
   padding: 0;
+  min-width: 0; /* Prevents input from pushing container width */
 }
 
 .app-icon.lucide-wrapper {

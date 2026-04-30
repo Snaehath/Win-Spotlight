@@ -1,6 +1,7 @@
 // ── Category Config ──────────────────────────────────────────────────────────
 
 export const CATEGORY_TITLES = {
+  "FILTER":    "Quick Filters",
   "RECENT":    "Recently Used",
   "COMMAND":   "Actions & Results",
   "WEB SHORTCUT": "Web Shortcuts",
@@ -19,7 +20,7 @@ export const CATEGORY_TITLES = {
 };
 
 export const CATEGORY_PRIORITY = [
-  "RECENT", "COMMAND", "WEB SHORTCUT", "WEB",
+  "FILTER", "RECENT", "COMMAND", "WEB SHORTCUT", "WEB",
   "APP", "DOC", "XLS", "PPT", "IMG", "VID",
   "DOWNLOADS", "DOCUMENTS", "PICTURES",
   "FOLDER", "FILE",
