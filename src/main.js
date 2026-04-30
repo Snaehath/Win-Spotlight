@@ -10,6 +10,8 @@ let selectedIndex = -1;
 let currentResults = [];
 let currentMode = "SEARCH"; // "SEARCH" or "NAMING"
 let pendingShortcutUrl = "";
+let filterTag;
+let activeFilter = null;
 
 const KEYWORD_MAP = {
   "app:": "Applications",
@@ -26,8 +28,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   searchInput = document.querySelector("#search-input");
   resultsList = document.querySelector("#results-list");
-  const filterTag = document.querySelector("#filter-tag");
-  let activeFilter = null;
+  filterTag = document.querySelector("#filter-tag");
 
   // ── Debounced Search ──────────────────────────────────────────────────────
   let searchTimeout;
@@ -126,6 +127,8 @@ window.addEventListener("DOMContentLoaded", () => {
   if (window.__TAURI__ && window.__TAURI__.event) {
     window.__TAURI__.event.listen("window-shown", () => {
       searchInput.value = "";
+      activeFilter = null;
+      if (filterTag) filterTag.classList.add("hidden");
       searchInput.focus();
       invoke("search_items", { query: "" }).then((res) => {
         currentResults = sortByPriority(res);
@@ -149,12 +152,24 @@ function render() {
 async function launchSelected(path, e) {
   if (!path) return;
 
+  // ── Alt + Click: Remove from history ──
+  if (e && e.altKey) {
+    await invoke("remove_from_history", { path });
+    // Refresh results immediately
+    const currentVal = searchInput.value;
+    const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
+    const res = await invoke("search_items", { query: fullQuery });
+    currentResults = sortByPriority(res);
+    render();
+    return;
+  }
+
+  // ── Shift + Click: Reveal in Explorer ──
   if (e && e.shiftKey && !path.startsWith("COMMAND:")) {
     revealSelected(path);
     return;
   }
   const lowerPath = path.toLowerCase();
-
   const item = currentResults[selectedIndex > 0 ? selectedIndex : 0];
   if (item && item.category === "FILTER") {
     searchInput.value = path;

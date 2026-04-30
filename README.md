@@ -10,6 +10,7 @@ Spotlight-Win provides a centralized interface to interact with your computer. I
 - **Web Shortcuts**: Create custom aliases (e.g., `yt`) to open specific websites in your default browser.
 - **Smart Calculations**: Perform math directly in the search bar (e.g., `12 * 5.5`).
 - **System Controls**: Quick access to power actions like `Shutdown`, `Restart`, or `Lock`.
+- **Advanced Filtering**: Use context-aware tags like `app:`, `file:`, `folder:`, or `command:` to narrow your search.
 - **Privacy Focused**: All indexing and history data stay on your local machine. No cloud tracking.
 
 ## Screenshots
@@ -30,6 +31,7 @@ Spotlight-Win provides a centralized interface to interact with your computer. I
 - **Fuzzy Matching**: Finds what you're looking for even if you make a typo.
 - **Low Resource Usage**: Built with Rust to ensure it doesn't slow down your background system processes.
 - **Persistent History**: Remembers your most recent launches for one-click access.
+- **Contextual Tags**: Visual filters transform into beautiful tags, keeping your search bar clean and professional.
 
 ## Installation
 
@@ -70,6 +72,15 @@ Spotlight-Win provides a centralized interface to interact with your computer. I
 | **Reveal in Folder**    | `Shift + Enter`           |
 | **Remove from History** | `Alt + Delete`            |
 | **Hide Launcher**       | `Escape`                  |
+
+### Advanced Search Filters
+
+Type a filter prefix followed by a colon to enter specialized search modes. The prefix will transform into a visual tag automatically.
+
+- `app:` Search only for installed applications.
+- `file:` Search only for documents and files.
+- `folder:` Search only for directories.
+- `command:` Access system actions (Shutdown, Lock, Math, etc.).
 
 ### Special Commands
 

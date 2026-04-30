@@ -4,27 +4,31 @@
   --bg-secondary: #1e293b;
   --accent-primary: #3b82f6;
   --accent-hover: #2563eb;
-  
+
   --text-main: #f8fafc;
   --text-dim: #94a3b8;
   --text-muted: rgba(148, 163, 184, 0.4);
-  
+
   --border-light: rgba(255, 255, 255, 0.1);
   --border-ultra-light: rgba(255, 255, 255, 0.03);
-  
+
   /* Effects */
   --blur-main: 32px;
   --blur-dialog: 12px;
   --shadow-main: 0 30px 60px rgba(0, 0, 0, 0.6);
   --shadow-dialog: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  
+
   /* Layout */
   --radius-main: 16px;
   --container-width: 680px;
   --container-height: 480px;
-  
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  font-size: 16px; 
+
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 16px;
   line-height: 1.5;
   font-weight: 400;
   color: var(--text-main);
@@ -35,7 +39,8 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -47,7 +52,7 @@ html, body {
 body {
   display: flex;
   justify-content: center;
-  align-items: flex-start; 
+  align-items: flex-start;
   padding-top: 40px; /* Buffer to prevent OS window edge artifacts */
 }
 
@@ -55,11 +60,11 @@ body {
   width: var(--container-width);
   height: var(--container-height);
   position: relative; /* Context for absolute overlays */
-  
+
   background: var(--bg-primary);
   backdrop-filter: blur(var(--blur-main));
-  border: 1px solid var(--border-light); 
-  border-radius: var(--radius-main); 
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-main);
   box-shadow: var(--shadow-main);
   display: flex;
   flex-direction: column;
@@ -95,8 +100,14 @@ body {
 }
 
 @keyframes tag-pop {
-  from { transform: scale(0.85); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .filter-tag.hidden {
@@ -160,7 +171,7 @@ body {
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border-left: 3px solid transparent;
-  
+
   /* Staggered entrance */
   opacity: 0;
   transform: translateX(-10px);
@@ -175,7 +186,8 @@ body {
   }
 }
 
-.result-item:hover, .result-item.selected {
+.result-item:hover,
+.result-item.selected {
   background: rgba(255, 255, 255, 0.05);
   border-left-color: var(--accent-primary);
 }
@@ -212,6 +224,39 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.03);
   display: flex;
   align-items: center;
+}
+
+.badge-new {
+  font-size: 0.8rem;
+  font-weight: 800;
+  margin-left: 8px;
+  font-family: monospace;
+  font-style: italic;
+  letter-spacing: 0.05em;
+
+  /* Shimmer Effect */
+  background: linear-gradient(
+    90deg,
+    #f43f5e 0%,
+    #fb7185 45%,
+    #fff 50%,
+    #fb7185 55%,
+    #f43f5e 100%
+  );
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: text-shimmer 3s linear infinite;
+}
+
+@keyframes text-shimmer {
+  from {
+    background-position: 200% center;
+  }
+  to {
+    background-position: 0% center;
+  }
 }
 
 /* Remove border-top from the very first header to keep it clean */
@@ -261,8 +306,14 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .result-item {
@@ -309,8 +360,14 @@ body {
 }
 
 @keyframes dialogScale {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .dialog-icon {
@@ -337,7 +394,8 @@ body {
   gap: 12px;
 }
 
-.btn-primary, .btn-secondary {
+.btn-primary,
+.btn-secondary {
   flex: 1;
   padding: 10px;
   border-radius: 8px;
@@ -367,4 +425,3 @@ body {
   background: rgba(255, 255, 255, 0.1);
   color: #f8fafc;
 }
-

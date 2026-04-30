@@ -1,23 +1,28 @@
 // ── Category Config ──────────────────────────────────────────────────────────
 
-export const CATEGORY_TITLES = {
-  "FILTER":    "Quick Filters",
-  "RECENT":    "Recently Used",
-  "COMMAND":   "Actions & Results",
-  "WEB SHORTCUT": "Web Shortcuts",
-  "WEB":       "Web & Discovery",
-  "APP":       "Applications",
-  "DOC":       "Documents",
-  "XLS":       "Spreadsheets",
-  "PPT":       "Presentations",
-  "IMG":       "Images",
-  "VID":       "Videos",
-  "FILE":      "Other Files",
-  "DOWNLOADS": "Downloads",
-  "DOCUMENTS": "Documents Folder",
-  "PICTURES":  "Pictures Folder",
-  "FOLDER":    "Folders",
+export const CATEGORY_CONFIG = {
+  "FILTER":    { title: "Quick Filters", isNew: true },
+  "RECENT":    { title: "Recently Used" },
+  "COMMAND":   { title: "Actions & Results" },
+  "WEB SHORTCUT": { title: "Web Shortcuts" },
+  "WEB":       { title: "Web & Discovery" },
+  "APP":       { title: "Applications" },
+  "DOC":       { title: "Documents" },
+  "XLS":       { title: "Spreadsheets" },
+  "PPT":       { title: "Presentations" },
+  "IMG":       { title: "Images" },
+  "VID":       { title: "Videos" },
+  "FILE":      { title: "Other Files" },
+  "DOWNLOADS": { title: "Downloads" },
+  "DOCUMENTS": { title: "Documents Folder" },
+  "PICTURES":  { title: "Pictures Folder" },
+  "FOLDER":    { title: "Folders" },
 };
+
+// Legacy support if needed, but we'll migrate to CATEGORY_CONFIG
+export const CATEGORY_TITLES = Object.fromEntries(
+  Object.entries(CATEGORY_CONFIG).map(([k, v]) => [k, v.title])
+);
 
 export const CATEGORY_PRIORITY = [
   "FILTER", "RECENT", "COMMAND", "WEB SHORTCUT", "WEB",

@@ -1,4 +1,4 @@
-import { escapeHtml, CATEGORY_TITLES } from './utils.js';
+import { escapeHtml, CATEGORY_CONFIG } from './utils.js';
 
 export function renderResults(resultsList, currentResults, selectedIndex, onLaunch) {
   resultsList.innerHTML = "";
@@ -9,7 +9,20 @@ export function renderResults(resultsList, currentResults, selectedIndex, onLaun
     if (item.category !== lastCategory) {
       const header = document.createElement("div");
       header.className = "category-header";
-      header.innerText = CATEGORY_TITLES[item.category] || item.category;
+      
+      const config = CATEGORY_CONFIG[item.category] || { title: item.category };
+      
+      const titleSpan = document.createElement("span");
+      titleSpan.innerText = config.title;
+      header.appendChild(titleSpan);
+
+      if (config.isNew) {
+        const badge = document.createElement("span");
+        badge.className = "badge-new";
+        badge.innerText = "NEW";
+        header.appendChild(badge);
+      }
+
       resultsList.appendChild(header);
       lastCategory = item.category;
     }
