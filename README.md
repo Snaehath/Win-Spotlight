@@ -1,4 +1,4 @@
-![Spotlight-Win Logo](public/app_icon.png)
+<img src="public/app_icon.png" alt="Spotlight-Win Logo" width="120"/>
 
 # Spotlight-Win
 
