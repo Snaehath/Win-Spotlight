@@ -12,6 +12,7 @@ let currentMode = "SEARCH"; // "SEARCH" or "NAMING"
 let pendingShortcutUrl = "";
 let filterTag;
 let activeFilter = null;
+let collapsedCategories = new Set();
 
 const KEYWORD_MAP = {
   "app:": "Applications",
@@ -81,12 +82,26 @@ window.addEventListener("DOMContentLoaded", () => {
         render();
       }
     } else if (e.key === "ArrowDown") {
-      selectedIndex = Math.min(selectedIndex + 1, currentResults.length - 1);
-      updateSelection(resultsList, selectedIndex);
+      let nextIndex = selectedIndex + 1;
+      // Skip collapsed categories
+      while (nextIndex < currentResults.length && collapsedCategories.has(currentResults[nextIndex].category)) {
+        nextIndex++;
+      }
+      if (nextIndex < currentResults.length) {
+        selectedIndex = nextIndex;
+        updateSelection(resultsList, selectedIndex);
+      }
       e.preventDefault();
     } else if (e.key === "ArrowUp") {
-      selectedIndex = Math.max(selectedIndex - 1, 0);
-      updateSelection(resultsList, selectedIndex);
+      let prevIndex = selectedIndex - 1;
+      // Skip collapsed categories
+      while (prevIndex >= 0 && collapsedCategories.has(currentResults[prevIndex].category)) {
+        prevIndex--;
+      }
+      if (prevIndex >= 0) {
+        selectedIndex = prevIndex;
+        updateSelection(resultsList, selectedIndex);
+      }
       e.preventDefault();
     } else if (
       e.key === "Backspace" &&
@@ -140,11 +155,20 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 function render() {
-  renderResults(resultsList, currentResults, selectedIndex, launchSelected);
+  renderResults(resultsList, currentResults, selectedIndex, launchSelected, collapsedCategories, toggleCategory);
   // Re-run Lucide to replace <i> with SVGs
   if (window.lucide) {
     window.lucide.createIcons();
   }
+}
+
+function toggleCategory(category) {
+  if (collapsedCategories.has(category)) {
+    collapsedCategories.delete(category);
+  } else {
+    collapsedCategories.add(category);
+  }
+  render();
 }
 
 // ── Launch Logic ─────────────────────────────────────────────────────────────

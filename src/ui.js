@@ -1,17 +1,24 @@
 import { escapeHtml, CATEGORY_CONFIG } from './utils.js';
 
-export function renderResults(resultsList, currentResults, selectedIndex, onLaunch) {
+export function renderResults(resultsList, currentResults, selectedIndex, onLaunch, collapsedCategories, onToggleCategory) {
   resultsList.innerHTML = "";
   let lastCategory = null;
 
   currentResults.forEach((item, index) => {
     // Category header
     if (item.category !== lastCategory) {
+      const isCollapsed = collapsedCategories && collapsedCategories.has(item.category);
       const header = document.createElement("div");
-      header.className = "category-header";
+      header.className = `category-header ${isCollapsed ? "collapsed" : ""}`;
       
       const config = CATEGORY_CONFIG[item.category] || { title: item.category };
       
+      // Toggle icon
+      const toggle = document.createElement("div");
+      toggle.className = "category-toggle";
+      toggle.innerHTML = '<i data-lucide="chevron-down"></i>';
+      header.appendChild(toggle);
+
       const titleSpan = document.createElement("span");
       titleSpan.innerText = config.title;
       header.appendChild(titleSpan);
@@ -23,12 +30,22 @@ export function renderResults(resultsList, currentResults, selectedIndex, onLaun
         header.appendChild(badge);
       }
 
+      if (onToggleCategory) {
+        header.onclick = () => onToggleCategory(item.category);
+      }
+
       resultsList.appendChild(header);
       lastCategory = item.category;
     }
 
+    // Skip rendering items if category is collapsed
+    if (collapsedCategories && collapsedCategories.has(item.category)) {
+      return;
+    }
+
     const li = document.createElement("li");
     li.className = `result-item ${index === selectedIndex ? "selected" : ""}`;
+    li.dataset.index = index;
     li.style.setProperty("--item-index", index);
 
     // Icon logic: handles base64 data URIs or named Lucide icons
@@ -79,8 +96,8 @@ export function renderResults(resultsList, currentResults, selectedIndex, onLaun
 
 export function updateSelection(resultsList, selectedIndex) {
   const items = resultsList.querySelectorAll(".result-item");
-  items.forEach((li, index) => {
-    if (index === selectedIndex) {
+  items.forEach((li) => {
+    if (parseInt(li.dataset.index) === selectedIndex) {
       li.classList.add("selected");
       li.scrollIntoView({ block: "nearest", behavior: "smooth" });
     } else {
