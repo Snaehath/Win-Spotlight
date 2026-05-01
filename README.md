@@ -1,3 +1,5 @@
+![Spotlight-Win Logo](public/app_icon.png)
+
 # Spotlight-Win
 
 A streamlined search bar and application launcher for Windows designed for speed and local-first privacy.
@@ -15,7 +17,7 @@ Spotlight-Win provides a centralized interface to interact with your computer. I
 
 ## Screenshots
 
-![Main Search Bar with Elite UI](media/image.png)
+![Main Search Bar with Elite UI](public/image.png)
 
 ## Quick Start
 
