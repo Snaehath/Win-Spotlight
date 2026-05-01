@@ -15,8 +15,7 @@ Spotlight-Win provides a centralized interface to interact with your computer. I
 
 ## Screenshots
 
-[Add screenshot here: The main search bar with results]
-[Add screenshot here: A web shortcut being created]
+![Main Search Bar with Elite UI](media/image.png)
 
 ## Quick Start
 
