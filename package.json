@@ -1,7 +1,7 @@
 {
   "name": "spotlight-win",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.5",
   "type": "module",
   "scripts": {
     "tauri": "tauri"

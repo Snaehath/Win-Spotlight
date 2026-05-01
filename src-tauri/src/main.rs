@@ -26,7 +26,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, Modifiers, Code,
 use tauri_plugin_autostart::ManagerExt;
 use tauri::{AppHandle, Manager, Emitter};
 use tauri::menu::{Menu, MenuItem};
-use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
 use windows::Win32::Storage::FileSystem::GetLogicalDrives;
 use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
 use windows::core::PCWSTR;
@@ -191,7 +191,7 @@ fn main() {
                     }
                 })
                 .on_tray_icon_event(|app, event| {
-                    if let TrayIconEvent::Click { .. } = event {
+                    if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
                         toggle_window(app.app_handle().clone());
                     }
                 })
