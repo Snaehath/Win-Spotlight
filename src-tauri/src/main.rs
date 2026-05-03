@@ -131,16 +131,12 @@ fn main() {
                 let needs_index = !index_dir.join("meta.json").exists();
                 std::thread::spawn(move || {
                     if needs_index {
-                        eprintln!("[indexer] Bootstrap crawl started...");
                         let items = scan_items(Some(&icon_cache_clone));
                         let _ = engine_clone.bulk_add(&items);
-                        eprintln!("[indexer] Bootstrap crawl done ({} items)", items.len());
                     }
                     
                     // Run a disk vacuum on every boot to prune old tantivy cache
-                    eprintln!("[indexer] Running segment vacuum...");
-                    engine_clone.vacuum();
-                    eprintln!("[indexer] Segment vacuum completed.");
+                    let _ = engine_clone.vacuum();
                 });
             }
 
@@ -185,7 +181,7 @@ fn main() {
                             app.exit(0);
                         }
                         "about" => {
-                            println!("Spotlight-Win v0.4.0")
+                            // Silent about
                         }
                         _ => {}
                     }

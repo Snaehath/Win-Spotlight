@@ -105,8 +105,7 @@ pub fn start_watcher(
 
         let mut debouncer = match new_debouncer(Duration::from_secs(3), tx) {
             Ok(d) => d,
-            Err(e) => {
-                eprintln!("[watcher] Failed to create debouncer: {}", e);
+            Err(_) => {
                 return;
             }
         };
@@ -114,13 +113,9 @@ pub fn start_watcher(
         for path_str in &watch_paths {
             let p = Path::new(path_str);
             if p.exists() {
-                if let Err(e) = debouncer.watcher().watch(p, RecursiveMode::Recursive) {
-                    eprintln!("[watcher] Cannot watch {}: {}", path_str, e);
-                }
+                let _ = debouncer.watcher().watch(p, RecursiveMode::Recursive);
             }
         }
-
-        eprintln!("[watcher] Active on {} paths", watch_paths.len());
 
         for result in rx {
             match result {
@@ -129,9 +124,7 @@ pub fn start_watcher(
                         process_event(&evt, &engine, &cache, &icon_cache);
                     }
                 }
-                Err(e) => {
-                    eprintln!("[watcher] Error: {:?}", e);
-                }
+                Err(_) => {}
             };
         }
     });
