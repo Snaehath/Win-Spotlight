@@ -194,7 +194,11 @@ async function launchSelected(path, e) {
     return;
   }
   const lowerPath = path.toLowerCase();
-  const item = currentResults[selectedIndex > 0 ? selectedIndex : 0];
+  
+  // Identify the specific item being launched (prioritizing the one that matches the path)
+  const item = currentResults.find(i => i.path === path) || 
+               (selectedIndex >= 0 ? currentResults[selectedIndex] : null);
+
   if (item && item.category === "FILTER") {
     searchInput.value = path;
     searchInput.dispatchEvent(new Event("input"));
