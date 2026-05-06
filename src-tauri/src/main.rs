@@ -14,7 +14,7 @@ mod currency;
 mod shell;
 
 use std::sync::{Arc, Mutex};
-use indexer::scan_items;
+use indexer::{scan_items, get_base_scan_paths};
 use search::{search_items, AppCache, IndexState, CommandState};
 use launcher::{launch_app, reveal_in_explorer};
 use history::HistoryManager;
@@ -27,7 +27,6 @@ use tauri_plugin_autostart::ManagerExt;
 use tauri::{AppHandle, Manager, Emitter};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton};
-use windows::Win32::Storage::FileSystem::GetLogicalDrives;
 use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
 use windows::core::PCWSTR;
 
@@ -69,20 +68,6 @@ fn hide_window(app_handle: AppHandle) {
 #[tauri::command]
 fn remove_from_history(path: String, history_manager: tauri::State<'_, HistoryManager>) {
     history_manager.remove_entry(&path);
-}
-
-fn get_drive_roots() -> Vec<String> {
-    let mut drives = Vec::new();
-    unsafe {
-        let mask = GetLogicalDrives();
-        for i in 0..26 {
-            if (mask & (1 << i)) != 0 {
-                let letter = (b'A' + i as u8) as char;
-                drives.push(format!("{}:\\", letter));
-            }
-        }
-    }
-    drives
 }
 
 fn main() {
@@ -155,11 +140,23 @@ fn main() {
             // ── File watcher (background) ──────────────────────────────────
             {
                 let cache_arc: Arc<Mutex<Vec<_>>> = Arc::new(Mutex::new(items));
+                
+                // Get refined paths (Start Menu, Desktop, etc.) instead of raw drive roots
+                let watch_paths: Vec<String> = get_base_scan_paths()
+                    .into_iter()
+                    .filter(|p: &std::path::PathBuf| {
+                        // Don't watch drive roots (e.g. "C:\") recursively!
+                        // That is the primary cause of high CPU.
+                        p.components().count() > 1 
+                    })
+                    .map(|p: std::path::PathBuf| p.to_string_lossy().to_string())
+                    .collect();
+
                 watcher::start_watcher(
                     engine.clone(),
                     cache_arc,
                     icon_cache.clone(),
-                    get_drive_roots(),
+                    watch_paths,
                 );
             }
 

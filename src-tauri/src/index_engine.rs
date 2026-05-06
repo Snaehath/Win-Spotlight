@@ -126,10 +126,9 @@ impl IndexEngine {
     }
 
     pub fn remove_by_path(&self, path: &str) -> tantivy::Result<()> {
-        let mut writer = self.writer.lock().unwrap();
+        let writer = self.writer.lock().unwrap();
         let path_term = Term::from_field_text(self.schema.f_path, path);
         writer.delete_term(path_term);
-        writer.commit()?;
         Ok(())
     }
 

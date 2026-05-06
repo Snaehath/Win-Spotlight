@@ -123,6 +123,8 @@ pub fn start_watcher(
                     for evt in events {
                         process_event(&evt, &engine, &cache, &icon_cache);
                     }
+                    // BATCH COMMIT: Save all changes to disk once per batch cycle
+                    let _ = engine.commit();
                 }
                 Err(_) => {}
             };
@@ -144,7 +146,6 @@ fn process_event(
             if path.exists() {
                 if let Some(item) = classify_path(path, icon_cache) {
                     let _ = engine.upsert(&item);
-                    let _ = engine.commit();
                     let mut lock = cache.lock().unwrap();
                     // Case-insensitive removal from cache to prevent duplicates
                     lock.retain(|i| !i.path.eq_ignore_ascii_case(&item.path));
