@@ -1,7 +1,6 @@
 // ── Category Config ──────────────────────────────────────────────────────────
 
 export const CATEGORY_CONFIG = {
-  "FILTER":    { title: "Quick Filters", isNew: true },
   "RECENT":    { title: "Recently Used" },
   "COMMAND":   { title: "Actions & Results" },
   "WEB SHORTCUT": { title: "Web Shortcuts" },
@@ -25,7 +24,7 @@ export const CATEGORY_TITLES = Object.fromEntries(
 );
 
 export const CATEGORY_PRIORITY = [
-  "FILTER", "RECENT", "COMMAND", "WEB SHORTCUT", "WEB",
+  "RECENT", "COMMAND", "WEB SHORTCUT", "WEB",
   "APP", "DOC", "XLS", "PPT", "IMG", "VID",
   "DOWNLOADS", "DOCUMENTS", "PICTURES",
   "FOLDER", "FILE",

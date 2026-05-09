@@ -69,7 +69,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // ── Keyboard navigation ──────────────────────────────────────────────────
   window.addEventListener("keydown", async (e) => {
-    if (e.key === "Delete" && e.altKey) {
+    if (e.key === "Enter" && e.altKey) {
       e.preventDefault();
       let targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
       const item = currentResults[targetIndex];
@@ -155,7 +155,16 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 function render() {
-  renderResults(resultsList, currentResults, selectedIndex, launchSelected, collapsedCategories, toggleCategory);
+  renderResults(
+    resultsList, 
+    currentResults, 
+    selectedIndex, 
+    launchSelected, 
+    revealSelected, 
+    forgetItem, 
+    collapsedCategories, 
+    toggleCategory
+  );
   // Re-run Lucide to replace <i> with SVGs
   if (window.lucide) {
     window.lucide.createIcons();
@@ -305,4 +314,16 @@ async function revealSelected(path) {
   if (!path || path.startsWith("COMMAND:")) return;
   await invoke("reveal_in_explorer", { path });
   await invoke("hide_window");
+}
+
+async function forgetItem(path) {
+  if (!path) return;
+  await invoke("remove_from_history", { path });
+  
+  // Refresh results immediately
+  const currentVal = searchInput.value;
+  const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
+  const res = await invoke("search_items", { query: fullQuery });
+  currentResults = sortByPriority(res);
+  render();
 }

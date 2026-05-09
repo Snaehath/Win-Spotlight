@@ -15,10 +15,24 @@
         <div class="search-input-wrapper">
           <i data-lucide="search" class="search-icon"></i>
           <div id="filter-tag" class="filter-tag hidden"></div>
-          <input id="search-input" type="text" placeholder="Search..." autofocus autocomplete="off" />
+          <input
+            id="search-input"
+            type="text"
+            placeholder="Search..."
+            autofocus
+            autocomplete="off"
+          />
         </div>
       </div>
       <ul id="results-list" class="results"></ul>
+
+      <!-- Command Footer for Discovery -->
+      <div id="command-footer" class="command-footer">
+        <div class="footer-hints">
+          <span class="hint"><kbd>Enter</kbd> Open</span>
+          <span class="hint"><kbd>Shift + Enter</kbd> Reveal</span>
+        </div>
+      </div>
 
       <!-- Custom Confirmation Dialog (Moved inside container for proper absolute positioning) -->
       <div id="confirm-dialog" class="dialog-overlay hidden">

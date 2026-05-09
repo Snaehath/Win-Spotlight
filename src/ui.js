@@ -1,18 +1,31 @@
-import { escapeHtml, CATEGORY_CONFIG } from './utils.js';
+import { escapeHtml, CATEGORY_CONFIG } from "./utils.js";
 
-export function renderResults(resultsList, currentResults, selectedIndex, onLaunch, collapsedCategories, onToggleCategory) {
+export function renderResults(
+  resultsList,
+  currentResults,
+  selectedIndex,
+  onLaunch,
+  onReveal,
+  onForget,
+  collapsedCategories,
+  onToggleCategory,
+) {
   resultsList.innerHTML = "";
   let lastCategory = null;
 
   currentResults.forEach((item, index) => {
+    // ── Skip Filters ──
+    if (item.category === "FILTER") return;
+
     // Category header
     if (item.category !== lastCategory) {
-      const isCollapsed = collapsedCategories && collapsedCategories.has(item.category);
+      const isCollapsed =
+        collapsedCategories && collapsedCategories.has(item.category);
       const header = document.createElement("div");
       header.className = `category-header ${isCollapsed ? "collapsed" : ""}`;
-      
+
       const config = CATEGORY_CONFIG[item.category] || { title: item.category };
-      
+
       // Toggle icon
       const toggle = document.createElement("div");
       toggle.className = "category-toggle";
@@ -48,29 +61,33 @@ export function renderResults(resultsList, currentResults, selectedIndex, onLaun
     li.dataset.index = index;
     li.style.setProperty("--item-index", index);
 
-    // Icon logic: handles base64 data URIs or named Lucide icons
+    // Icon logic
     let iconHTML = "";
     if (item.icon) {
       if (item.icon.startsWith("data:") || item.icon.length > 50) {
-        // Base64 image
-        const iconSrc = item.icon.startsWith("data:") ? item.icon : `data:image/png;base64,${item.icon}`;
+        const iconSrc = item.icon.startsWith("data:")
+          ? item.icon
+          : `data:image/png;base64,${item.icon}`;
         iconHTML = `<img src="${escapeHtml(iconSrc)}" class="app-icon" alt="" />`;
       } else {
-        // Lucide icon name
         iconHTML = `<div class="app-icon lucide-wrapper"><i data-lucide="${escapeHtml(item.icon)}"></i></div>`;
       }
     } else {
-      // Default placeholder
-      const isCmd = item.category === 'COMMAND' || item.category === 'WEB' || item.category === 'WEB SHORTCUT';
-      iconHTML = `<div class="app-icon placeholder ${isCmd ? 'cmd-icon' : ''}">
-                   ${isCmd ? '<i data-lucide="terminal"></i>' : ''}
+      const isCmd =
+        item.category === "COMMAND" ||
+        item.category === "WEB" ||
+        item.category === "WEB SHORTCUT";
+      iconHTML = `<div class="app-icon placeholder ${isCmd ? "cmd-icon" : ""}">
+                   ${isCmd ? '<i data-lucide="terminal"></i>' : ""}
                  </div>`;
     }
 
-    // Sub-label: escape safely
+    // Sub-label
     const subLabel = item.inline_display
       ? `<span class="app-path inline-result">${escapeHtml(item.inline_display)}</span>`
-      : (item.path ? `<span class="app-path">${escapeHtml(item.path)}</span>` : "");
+      : item.path
+        ? `<span class="app-path">${escapeHtml(item.path)}</span>`
+        : "";
 
     li.innerHTML = `
       ${iconHTML}
@@ -80,10 +97,42 @@ export function renderResults(resultsList, currentResults, selectedIndex, onLaun
         </div>
         ${subLabel}
       </div>
+      <div class="action-bar">
+        <button class="action-icon reveal-btn" title="Reveal in Explorer">
+          <i data-lucide="folder-search"></i>
+        </button>
+        <button class="action-icon forget-btn" title="Remove from History">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </div>
     `;
 
+    // Click handlers
     if (item.path) {
       li.onclick = (e) => onLaunch(item.path, e);
+
+      const revealBtn = li.querySelector(".reveal-btn");
+      const forgetBtn = li.querySelector(".forget-btn");
+
+      revealBtn.onclick = (e) => {
+        e.stopPropagation();
+        onReveal(item.path);
+      };
+
+      forgetBtn.onclick = (e) => {
+        e.stopPropagation();
+        onForget(item.path);
+      };
+
+      // Hide reveal for commands
+      if (item.category === "COMMAND") {
+        revealBtn.style.display = "none";
+      }
+
+      // Hide forget if not RECENT
+      if (item.category !== "RECENT") {
+        forgetBtn.style.display = "none";
+      }
     }
 
     resultsList.appendChild(li);
