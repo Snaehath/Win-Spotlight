@@ -15,13 +15,16 @@
         <div class="search-input-wrapper">
           <i data-lucide="search" class="search-icon"></i>
           <div id="filter-tag" class="filter-tag hidden"></div>
-          <input
-            id="search-input"
-            type="text"
-            placeholder="Search..."
-            autofocus
-            autocomplete="off"
-          />
+            <input
+              id="search-input"
+              type="text"
+              placeholder="Search..."
+              autofocus
+              autocomplete="off"
+            />
+            <div id="help-btn" class="help-btn-container">
+              <i data-lucide="help-circle" class="help-btn-icon"></i>
+            </div>
         </div>
       </div>
       <ul id="results-list" class="results"></ul>
@@ -43,6 +46,45 @@
           <div class="dialog-actions">
             <button id="dialog-cancel" class="btn-secondary">Cancel</button>
             <button id="dialog-ok" class="btn-primary">Proceed</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Help Overlay (The Manual) -->
+      <div id="help-overlay" class="help-overlay hidden">
+        <div class="help-content">
+          <div class="help-header">
+            <h3>Helper Manual</h3>
+            <span class="close-hint">Press <kbd>Esc</kbd> to close</span>
+          </div>
+          
+          <div class="help-grid">
+            <div class="help-section">
+              <h4>Navigation</h4>
+              <div class="help-row"><span>Move Selection</span> <div class="keys"><kbd>↑</kbd><kbd>↓</kbd></div></div>
+              <div class="help-row"><span>Open / Launch</span> <kbd>Enter</kbd></div>
+              <div class="help-row"><span>Hide Window</span> <kbd>Esc</kbd></div>
+            </div>
+
+            <div class="help-section">
+              <h4>Item Actions</h4>
+              <div class="help-row"><span>Reveal in Folder</span> <kbd>Shift</kbd> + <kbd>Enter</kbd></div>
+              <div class="help-row"><span>Forget Item</span> <kbd>Alt</kbd> + <kbd>Enter</kbd></div>
+            </div>
+
+            <div class="help-section">
+              <h4>Search Filters</h4>
+              <div class="help-row"><span>Apps Only</span> <kbd>app:</kbd></div>
+              <div class="help-row"><span>Files Only</span> <kbd>file:</kbd></div>
+              <div class="help-row"><span>Folders Only</span> <kbd>folder:</kbd></div>
+            </div>
+
+            <div class="help-section">
+              <h4>Advanced</h4>
+              <div class="help-row"><span>System Actions</span> <kbd>> sys</kbd></div>
+              <div class="help-row"><span>Manual Command</span> <kbd>/help</kbd></div>
+              <div class="help-row"><span>Web Shortcut</span> <kbd>CREATE_SHORTCUT:</kbd></div>
+            </div>
           </div>
         </div>
       </div>

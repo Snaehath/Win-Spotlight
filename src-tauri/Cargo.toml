@@ -41,3 +41,10 @@ reqwest = { version = "0.12", features = ["blocking", "json"] }
 md5 = "0.8.0"
 
 
+
+[profile.release]
+opt-level = "z"     # Optimize for size
+lto = true          # Enable Link Time Optimization
+codegen-units = 1   # Reduce parallel code generation for better optimization
+panic = "abort"     # Remove stack unwinding code
+strip = true        # Automatically strip symbols from the binary

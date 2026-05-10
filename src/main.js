@@ -13,6 +13,7 @@ let pendingShortcutUrl = "";
 let filterTag;
 let activeFilter = null;
 let collapsedCategories = new Set();
+let helpOverlay;
 
 const KEYWORD_MAP = {
   "app:": "Applications",
@@ -30,6 +31,12 @@ window.addEventListener("DOMContentLoaded", () => {
   searchInput = document.querySelector("#search-input");
   resultsList = document.querySelector("#results-list");
   filterTag = document.querySelector("#filter-tag");
+  helpOverlay = document.querySelector("#help-overlay");
+
+  document.querySelector("#help-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    helpOverlay.classList.toggle("hidden");
+  });
 
   // ── Debounced Search ──────────────────────────────────────────────────────
   let searchTimeout;
@@ -59,6 +66,14 @@ window.addEventListener("DOMContentLoaded", () => {
 
     searchTimeout = setTimeout(async () => {
       const currentVal = searchInput.value;
+
+      // ── Elite Internal Command: /help ──
+      if (currentVal.toLowerCase() === "/help") {
+        helpOverlay.classList.remove("hidden");
+        searchInput.value = "";
+        return;
+      }
+
       const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
       const res = await invoke("search_items", { query: fullQuery });
       currentResults = sortByPriority(res);
@@ -125,7 +140,11 @@ window.addEventListener("DOMContentLoaded", () => {
         if (item.path) launchSelected(item.path, e);
       }
     } else if (e.key === "Escape") {
-      invoke("hide_window");
+      if (!helpOverlay.classList.contains("hidden")) {
+        helpOverlay.classList.add("hidden");
+      } else {
+        invoke("hide_window");
+      }
     }
   });
 

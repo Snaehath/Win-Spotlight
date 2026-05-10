@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotlight-Win | The Elite Insight Engine for Windows</title>
+    <meta name="description" content="A high-fidelity, privacy-first search utility for Windows power users. Zero Ads. Zero Bing. Built in Rust for ultimate speed.">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        :root {
+            --bg-dark: #020617;
+            --accent-primary: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.5);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --glass-bg: rgba(15, 23, 42, 0.8);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* --- Navigation --- */
+        nav {
+            padding: 1.5rem 0;
+            border-bottom: 1px solid var(--glass-border);
+            backdrop-filter: blur(12px);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 100;
+            background: rgba(2, 6, 23, 0.8);
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            font-size: 1.25rem;
+            color: var(--text-main);
+            text-decoration: none;
+        }
+
+        .logo i {
+            color: var(--accent-primary);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-dim);
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent-primary);
+        }
+
+        /* --- Hero Section --- */
+        .hero {
+            padding: 10rem 0 6rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            opacity: 0.2;
+            z-index: -1;
+        }
+
+        .hero h1 {
+            font-size: 4rem;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(to bottom right, #fff 50%, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-dim);
+            max-width: 600px;
+            margin: 0 auto 3rem;
+        }
+
+        .cta-group {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+        }
+
+        .btn {
+            padding: 0.8rem 2rem;
+            border-radius: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: var(--accent-primary);
+            color: white;
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.5);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            background: #2563eb;
+            box-shadow: 0 15px 30px -5px rgba(59, 130, 246, 0.6);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border: 1px solid var(--glass-border);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .hero-visual {
+            margin-top: 5rem;
+            position: relative;
+            display: inline-block;
+        }
+
+        .hero-logo {
+            width: 180px;
+            height: 180px;
+            position: relative;
+            z-index: 2;
+            filter: drop-shadow(0 20px 40px rgba(0,0,0,0.5));
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .logo-glow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            background: var(--accent-primary);
+            filter: blur(80px);
+            opacity: 0.4;
+            z-index: 1;
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.4; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.6; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        /* --- Features Section --- */
+        .features {
+            padding: 8rem 0;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 5rem;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .section-header p {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: var(--glass-bg);
+            padding: 3rem 2rem;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-10px);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent-primary);
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card p {
+            color: var(--text-dim);
+        }
+
+        /* --- "Inside the Engine" --- */
+        .engine {
+            padding: 8rem 0;
+            background: linear-gradient(to bottom, transparent, rgba(59, 130, 246, 0.05));
+        }
+
+        .engine-content {
+            display: flex;
+            align-items: center;
+            gap: 4rem;
+        }
+
+        .engine-text {
+            flex: 1;
+        }
+
+        .engine-stats {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .stat-card {
+            background: var(--glass-bg);
+            padding: 2rem;
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--accent-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        /* --- Footer --- */
+        footer {
+            padding: 4rem 0;
+            border-top: 1px solid var(--glass-border);
+            text-align: center;
+        }
+
+        .footer-logo {
+            margin-bottom: 2rem;
+        }
+
+        .copyright {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.5rem; }
+            .engine-content { flex-direction: column; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="container nav-content">
+            <a href="#" class="logo">
+                <i data-lucide="satellite"></i>
+                Spotlight-Win
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#engine">The Engine</a>
+                <a href="https://github.com/Snaehath/Win-Spotlight">GitHub</a>
+            </div>
+            <a href="#" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.9rem;">v0.4.5</a>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="container">
+            <h1>The Elite Insight Engine<br>for Windows</h1>
+            <p>A high-fidelity, privacy-first search utility. Zero Ads. Zero Bing. Built in Rust for absolute desktop mastery.</p>
+            <div class="cta-group">
+                <a href="#" class="btn btn-primary">
+                    <i data-lucide="download"></i>
+                    Download for Windows
+                </a>
+                <a href="https://github.com/Snaehath/Win-Spotlight" class="btn btn-secondary">
+                    <i data-lucide="github"></i>
+                    Source Code
+                </a>
+            </div>
+            <div class="hero-visual">
+                <img src="public/app_icon.png" alt="Spotlight-Win Logo" class="hero-logo">
+                <div class="logo-glow"></div>
+            </div>
+        </div>
+    </header>
+
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2>Engineered for Power Users</h2>
+                <p>Stop searching. Start finding.</p>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon"><i data-lucide="zap"></i></div>
+                    <h3>Silent Intelligence</h3>
+                    <p>Optimized background indexing that consumes less than 1% CPU. Fast, quiet, and invisible.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i data-lucide="shield-check"></i></div>
+                    <h3>Zero-Cloud Privacy</h3>
+                    <p>Your data stays on your disk. No telemetry, no web tracking, and absolutely no Bing search results.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i data-lucide="layers"></i></div>
+                    <h3>Instant Previews</h3>
+                    <p>See metadata and file contents without ever leaving the search bar. Real-time insights at the speed of thought.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="engine" class="engine">
+        <div class="container">
+            <div class="engine-content">
+                <div class="engine-text">
+                    <h2>Built on Modern Steel</h2>
+                    <p>Spotlight-Win isn't just another Electron app. It's built with a low-level Rust backend and a lightweight Tauri frontend to ensure your system resources are used for work, not for searching.</p>
+                    <br>
+                    <p>Using the Tantivy search library, we provide full-text indexing capabilities that outpace native Windows Search by an order of magnitude.</p>
+                </div>
+                <div class="engine-stats">
+                    <div class="stat-card">
+                        <div class="stat-value">< 150ms</div>
+                        <div class="stat-label">Response Time</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">< 1%</div>
+                        <div class="stat-label">CPU Overhead</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">100%</div>
+                        <div class="stat-label">Offline-First</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">Rust</div>
+                        <div class="stat-label">Core Engine</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-logo logo" style="justify-content: center;">
+                <i data-lucide="satellite"></i>
+                Spotlight-Win
+            </a>
+            <p class="copyright">&copy; 2026 Spotlight-Win Team. Built for the Elite.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+        
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html>
