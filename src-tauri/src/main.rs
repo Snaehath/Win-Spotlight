@@ -1,17 +1,19 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod shell;
+
+// core modules
+mod shortcuts;
 mod indexer;
 mod launcher;
 mod search;
 mod history;
 mod ranking;
 mod commands;
-mod shortcuts;
 mod index_engine;
 mod watcher;
 mod currency;
-mod shell;
 
 use std::sync::{Arc, Mutex};
 use indexer::{scan_items, get_base_scan_paths};
@@ -21,6 +23,9 @@ use history::HistoryManager;
 use commands::CommandRegistry;
 use index_engine::IndexEngine;
 use shortcuts::{ShortcutManager, save_shortcut, clear_shortcuts};
+
+// types
+struct ShortcutEnabled(Arc<Mutex<bool>>);
 
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, Modifiers, Code, ShortcutState};
 use tauri_plugin_autostart::ManagerExt;
@@ -45,6 +50,7 @@ fn show_error_and_exit(title: &str, message: &str) -> ! {
     std::process::exit(1);
 }
 
+// tauri commands
 #[tauri::command]
 fn toggle_window(app_handle: AppHandle) {
     if let Some(window) = app_handle.get_webview_window("main") {
@@ -62,6 +68,40 @@ fn toggle_window(app_handle: AppHandle) {
 fn hide_window(app_handle: AppHandle) {
     if let Some(window) = app_handle.get_webview_window("main") {
         window.hide().unwrap();
+    }
+}
+
+/// Detects if a full-screen application (like a game) is in the foreground.
+/// We use this to automatically ignore Ctrl+Space during intense gameplay.
+fn is_fullscreen_app_active() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, GetWindowRect, GetSystemMetrics, 
+        SM_CXSCREEN, SM_CYSCREEN, GetWindowTextW
+    };
+    
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.is_invalid() { return false; }
+
+        // Skip detection for our own window
+        let mut title = [0u16; 256];
+        let len = GetWindowTextW(hwnd, &mut title);
+        let title_str = String::from_utf16_lossy(&title[..len as usize]);
+        if title_str.contains("Spotlight-Win") { return false; }
+
+        let mut rect = Default::default();
+        if GetWindowRect(hwnd, &mut rect).is_ok() {
+            let width = rect.right - rect.left;
+            let height = rect.bottom - rect.top;
+            
+            let screen_w = GetSystemMetrics(SM_CXSCREEN);
+            let screen_h = GetSystemMetrics(SM_CYSCREEN);
+            
+            // If the window covers the full primary screen, it's likely a game.
+            width >= screen_w && height >= screen_h
+        } else {
+            false
+        }
     }
 }
 
@@ -131,6 +171,9 @@ fn main() {
                 apps: Mutex::new(items.clone()),
             });
 
+            // ── Global Shortcut Enabled State ──────────────────────────────
+            app.manage(ShortcutEnabled(Arc::new(Mutex::new(true))));
+
             // ── Tantivy state ──────────────────────────────────────────────
             app.manage(IndexState(engine.clone()));
 
@@ -162,9 +205,10 @@ fn main() {
 
             // ── System Tray ──────────────────────────────────────────────────
             let show_i = MenuItem::with_id(app, "show", "Show Spotlight", true, None::<&str>)?;
-            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let pause_i = MenuItem::with_id(app, "pause", "Pause Global Shortcut", true, None::<&str>)?;
             let about_1 = MenuItem::with_id(app, "about", "About Spotlight", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &about_1, &quit_i])?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &pause_i, &about_1, &quit_i])?;
 
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -173,6 +217,21 @@ fn main() {
                     match event.id.as_ref() {
                         "show" => {
                             toggle_window(app.clone());
+                        }
+                        "pause" => {
+                            let state = app.state::<ShortcutEnabled>();
+                            let mut enabled = state.0.lock().unwrap();
+                            *enabled = !*enabled;
+                            
+                            let new_text = if *enabled { "Pause Global Shortcut" } else { "▶ Resume Global Shortcut" };
+                            
+                            if let Some(menu) = app.menu() {
+                                if let Some(item_kind) = menu.get("pause") {
+                                    if let Some(menu_item) = item_kind.as_menuitem() {
+                                        let _ = menu_item.set_text(new_text);
+                                    }
+                                }
+                            }
                         }
                         "quit" => {
                             app.exit(0);
@@ -197,10 +256,19 @@ fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        // shortcuts
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
-                    if shortcut.matches(Modifiers::CONTROL, Code::Space)
+                    let state = app.state::<ShortcutEnabled>();
+                    let is_manual_enabled = *state.0.lock().unwrap();
+
+                    // SMART DETECTION: Automatically ignore if a full-screen game is in foreground
+                    let is_gaming = is_fullscreen_app_active();
+
+                    if is_manual_enabled 
+                        && !is_gaming
+                        && shortcut.matches(Modifiers::CONTROL, Code::Space)
                         && event.state() == ShortcutState::Pressed
                     {
                         toggle_window(app.clone());

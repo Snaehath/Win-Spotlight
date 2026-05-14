@@ -1,5 +1,6 @@
 import { escapeHtml, CATEGORY_CONFIG } from "./utils.js";
 
+// ui
 export function renderResults(
   resultsList,
   currentResults,

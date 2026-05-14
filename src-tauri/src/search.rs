@@ -33,6 +33,7 @@ impl From<SearchItem> for SearchResult {
     }
 }
 
+// search
 #[tauri::command]
 pub fn search_items(
     query: String,
@@ -157,7 +158,19 @@ pub fn search_items(
             true
         })
         .filter_map(|item| {
-            let fuzzy = matcher.fuzzy_match(&item.name, actual_query);
+            let score_name = matcher.fuzzy_match(&item.name, actual_query);
+            let score_path = if actual_query.len() > 3 {
+                matcher.fuzzy_match(&item.path, actual_query).map(|s| s - 50) // Penalty for path match
+            } else {
+                None
+            };
+
+            let fuzzy = match (score_name, score_path) {
+                (Some(s1), Some(s2)) => Some(s1.max(s2)),
+                (Some(s), None) | (None, Some(s)) => Some(s),
+                (None, None) => None,
+            };
+
             let acronym = acronym_match(&item.name, actual_query);
             match (fuzzy, acronym) {
                 (Some(f), Some(a)) => Some((f.max(a), item.clone())),

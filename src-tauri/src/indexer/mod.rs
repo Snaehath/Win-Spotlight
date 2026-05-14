@@ -27,6 +27,7 @@ pub struct SearchItem {
     pub category: String,
 }
 
+// scanner
 pub fn scan_items(cache: Option<&IconCache>) -> Vec<SearchItem> {
     let mut items = Vec::new();
     let base_paths = get_base_scan_paths();
@@ -100,7 +101,7 @@ pub fn scan_items(cache: Option<&IconCache>) -> Vec<SearchItem> {
                 }
             } else if file_path.is_dir() && entry.depth() > 0 {
                 let parent_name = file_path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()).unwrap_or("");
-                let display_name = if !parent_name.is_empty() && entry.depth() > 1 {
+                let display_name = if !parent_name.is_empty() && entry.depth() > 3 {
                     format!("{} > {}", parent_name, name)
                 } else {
                     name.to_string()

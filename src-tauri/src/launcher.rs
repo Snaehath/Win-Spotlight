@@ -1,10 +1,10 @@
-use std::process::Command;
 use std::os::windows::process::CommandExt;
 use tauri::{State, AppHandle};
 use crate::history::HistoryManager;
 use crate::search::{AppCache, CommandState};
 use crate::commands::execute_command_result;
 
+// launcher
 #[tauri::command]
 pub fn launch_app(
     path: String,
@@ -53,15 +53,12 @@ pub fn launch_app(
 
     if is_url {
         // Use native ShellExecuteW to open URLs securely.
-        // This bypasses the shell (PowerShell/CMD) and is immune to injection.
         crate::shell::open_path_or_url(&path).map_err(|e| e.to_string())?;
     } else {
-        // Launch the item securely via the native default handler
-        Command::new("explorer.exe")
-            .arg(&path)
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        // Launch the item securely via the native default handler (ShellExecuteW)
+        // This is more robust than calling explorer.exe directly and handles 
+        // folders, files, and links with their default associations.
+        crate::shell::open_path_or_url(&path).map_err(|e| e.to_string())?;
     }
 
     Ok(true) // Hide window
