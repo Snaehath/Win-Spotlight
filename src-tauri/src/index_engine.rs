@@ -1,4 +1,4 @@
-/// Persistent index backed by Tantivy 0.22.
+//! Persistent index backed by Tantivy 0.22.
 
 use std::path::Path;
 use std::sync::Mutex;

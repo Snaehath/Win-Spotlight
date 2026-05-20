@@ -55,18 +55,18 @@ pub fn search_items(
     let mut forced_item_type: Option<crate::indexer::ItemType> = None;
     let mut actual_query = query_trimmed;
 
-    if query_trimmed.starts_with("app:") {
+    if let Some(stripped) = query_trimmed.strip_prefix("app:") {
         forced_category = Some("APP");
-        actual_query = query_trimmed["app:".len()..].trim();
-    } else if query_trimmed.starts_with("file:") {
+        actual_query = stripped.trim();
+    } else if let Some(stripped) = query_trimmed.strip_prefix("file:") {
         forced_item_type = Some(crate::indexer::ItemType::File);
-        actual_query = query_trimmed["file:".len()..].trim();
-    } else if query_trimmed.starts_with("folder:") {
+        actual_query = stripped.trim();
+    } else if let Some(stripped) = query_trimmed.strip_prefix("folder:") {
         forced_item_type = Some(crate::indexer::ItemType::Folder);
-        actual_query = query_trimmed["folder:".len()..].trim();
-    } else if query_trimmed.starts_with("command:") {
+        actual_query = stripped.trim();
+    } else if let Some(stripped) = query_trimmed.strip_prefix("command:") {
         forced_category = Some("COMMAND");
-        actual_query = query_trimmed["command:".len()..].trim();
+        actual_query = stripped.trim();
     }
 
     let items = state.apps.lock().unwrap();
@@ -420,7 +420,7 @@ fn is_math_expression(query: &str) -> bool {
     let s = query.replace(' ', "");
     // Must contain an operator and start with a digit or minus
     let has_op = s.contains('+') || s.contains('*') || s.contains('/') ||
-        (s.contains('-') && s.find('-').map_or(false, |i| i > 0));
+        (s.contains('-') && s.find('-').is_some_and(|i| i > 0));
     if !has_op { return false; }
     // Must be mostly numeric
     s.chars().all(|c| c.is_ascii_digit() || c == '.' || c == '+' || c == '-' || c == '*' || c == '/')

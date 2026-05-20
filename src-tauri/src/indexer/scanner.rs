@@ -54,7 +54,7 @@ pub fn should_skip_directory(name: &str, depth: usize) -> bool {
     let lower_name = name.to_lowercase();
     
     // Critical system folders to skip during shallow scans
-    if depth >= 1 && depth <= 2 && (
+    if (1..=2).contains(&depth) && (
         lower_name == "windows" || 
         lower_name == "users" || 
         lower_name == "program files" || 

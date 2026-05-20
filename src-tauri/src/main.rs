@@ -71,39 +71,6 @@ fn hide_window(app_handle: AppHandle) {
     }
 }
 
-/// Detects if a full-screen application (like a game) is in the foreground.
-/// We use this to automatically ignore Ctrl+Space during intense gameplay.
-fn is_fullscreen_app_active() -> bool {
-    use windows::Win32::UI::WindowsAndMessaging::{
-        GetForegroundWindow, GetWindowRect, GetSystemMetrics, 
-        SM_CXSCREEN, SM_CYSCREEN, GetWindowTextW
-    };
-    
-    unsafe {
-        let hwnd = GetForegroundWindow();
-        if hwnd.is_invalid() { return false; }
-
-        // Skip detection for our own window
-        let mut title = [0u16; 256];
-        let len = GetWindowTextW(hwnd, &mut title);
-        let title_str = String::from_utf16_lossy(&title[..len as usize]);
-        if title_str.contains("Spotlight-Win") { return false; }
-
-        let mut rect = Default::default();
-        if GetWindowRect(hwnd, &mut rect).is_ok() {
-            let width = rect.right - rect.left;
-            let height = rect.bottom - rect.top;
-            
-            let screen_w = GetSystemMetrics(SM_CXSCREEN);
-            let screen_h = GetSystemMetrics(SM_CYSCREEN);
-            
-            // If the window covers the full primary screen, it's likely a game.
-            width >= screen_w && height >= screen_h
-        } else {
-            false
-        }
-    }
-}
 
 #[tauri::command]
 fn remove_from_history(path: String, history_manager: tauri::State<'_, HistoryManager>) {
@@ -161,7 +128,7 @@ fn main() {
                     }
                     
                     // Run a disk vacuum on every boot to prune old tantivy cache
-                    let _ = engine_clone.vacuum();
+                    engine_clone.vacuum();
                 });
             }
 
@@ -263,11 +230,7 @@ fn main() {
                     let state = app.state::<ShortcutEnabled>();
                     let is_manual_enabled = *state.0.lock().unwrap();
 
-                    // SMART DETECTION: Automatically ignore if a full-screen game is in foreground
-                    let is_gaming = is_fullscreen_app_active();
-
                     if is_manual_enabled 
-                        && !is_gaming
                         && shortcut.matches(Modifiers::CONTROL, Code::Space)
                         && event.state() == ShortcutState::Pressed
                     {

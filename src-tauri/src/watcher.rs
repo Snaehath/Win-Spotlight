@@ -1,5 +1,5 @@
-/// File watcher — monitors drive roots and emits incremental index updates.
-/// Uses `notify-debouncer-mini` v0.7 which has its own DebouncedEventKind enum.
+//! File watcher — monitors drive roots and emits incremental index updates.
+//! Uses `notify-debouncer-mini` v0.7 which has its own DebouncedEventKind enum.
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -117,17 +117,12 @@ pub fn start_watcher(
             }
         }
 
-        for result in rx {
-            match result {
-                Ok(events) => {
-                    for evt in events {
-                        process_event(&evt, &engine, &cache, &icon_cache);
-                    }
-                    // BATCH COMMIT: Save all changes to disk once per batch cycle
-                    let _ = engine.commit();
-                }
-                Err(_) => {}
-            };
+        for events in rx.into_iter().flatten() {
+            for evt in events {
+                process_event(&evt, &engine, &cache, &icon_cache);
+            }
+            // BATCH COMMIT: Save all changes to disk once per batch cycle
+            let _ = engine.commit();
         }
     });
 }
@@ -141,23 +136,20 @@ fn process_event(
     let path = &evt.path;
     let path_str = path.to_string_lossy().to_string();
 
-    match evt.kind {
-        DebouncedEventKind::Any => {
-            if path.exists() {
-                if let Some(item) = classify_path(path, icon_cache) {
-                    let _ = engine.upsert(&item);
-                    let mut lock = cache.lock().unwrap();
-                    // Case-insensitive removal from cache to prevent duplicates
-                    lock.retain(|i| !i.path.eq_ignore_ascii_case(&item.path));
-                    lock.push(item);
-                }
-            } else {
-                let _ = engine.remove_by_path(&path_str);
+    if let DebouncedEventKind::Any = evt.kind {
+        if path.exists() {
+            if let Some(item) = classify_path(path, icon_cache) {
+                let _ = engine.upsert(&item);
                 let mut lock = cache.lock().unwrap();
-                // Case-insensitive removal on deletion
-                lock.retain(|i| !i.path.eq_ignore_ascii_case(&path_str));
+                // Case-insensitive removal from cache to prevent duplicates
+                lock.retain(|i| !i.path.eq_ignore_ascii_case(&item.path));
+                lock.push(item);
             }
+        } else {
+            let _ = engine.remove_by_path(&path_str);
+            let mut lock = cache.lock().unwrap();
+            // Case-insensitive removal on deletion
+            lock.retain(|i| !i.path.eq_ignore_ascii_case(&path_str));
         }
-        _ => {}
     }
 }

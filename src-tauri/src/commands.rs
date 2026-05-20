@@ -1,10 +1,10 @@
-/// Command Plugin System — Extensible registry for `> prefix` commands.
-///
-/// Usage examples:
-///   > calc 10 + 20           — Evaluate a math expression
-///   > g rust ownership       — Web search via browser
-///   > open notepad           — Launch a named system utility
-///   > sys sleep              — System power actions
+//! Command Plugin System — Extensible registry for `> prefix` commands.
+//!
+//! Usage examples:
+//!   > calc 10 + 20           — Evaluate a math expression
+//!   > g rust ownership       — Web search via browser
+//!   > open notepad           — Launch a named system utility
+//!   > sys sleep              — System power actions
 
 use std::process::Command as SysCommand;
 use std::os::windows::process::CommandExt;
@@ -85,7 +85,7 @@ impl CommandRegistry {
 // ── Plugins ────────────────────────────────────────────────────────────────
 
 /// > calc <expression>  — Basic math via Windows Calculator for complex math;
-///   simple expressions (+ - * /) are evaluated inline.
+/// > simple expressions (+ - * /) are evaluated inline.
 struct CalcPlugin;
 impl CommandPlugin for CalcPlugin {
     fn prefix(&self) -> &str { "calc" }

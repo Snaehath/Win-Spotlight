@@ -14,9 +14,7 @@ pub fn launch_app(
     cache: State<'_, AppCache>,
     cmd_state: State<'_, CommandState>,
 ) -> Result<bool, String> {
-    if path.starts_with("COMMAND:") {
-        let query = &path[8..];
-        
+    if let Some(query) = path.strip_prefix("COMMAND:") {
         // Handle raw URLs from shortcuts or intent detection
         if query.starts_with("http") {
             use crate::commands::CommandResult;
