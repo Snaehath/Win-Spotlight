@@ -36,17 +36,22 @@ pub fn launch_app(
     index_state.0.record_launch(&path, &items);
     drop(items);
 
-    // Ensure the path was properly identified in the AppCache (prevent arbitrary path execution)
-    let is_valid = {
-        let items = cache.apps.lock().unwrap();
-        items.iter().any(|item| item.path == path)
-    };
-    
-    // Check if it's a URL
+    // Ensure the path was properly identified in the AppCache or is a valid URL
     let is_url = path.starts_with("http://") || path.starts_with("https://");
 
-    if !is_url && !std::path::Path::new(&path).exists() && !is_valid {
-        return Err("Path validation failed: Not found on disk or cache".to_string());
+    if !is_url {
+        let is_valid = {
+            let items = cache.apps.lock().unwrap();
+            items.iter().any(|item| item.path == path)
+        };
+        
+        if !is_valid {
+            return Err("Path validation failed: Path not present in search index. Launch aborted for security.".to_string());
+        }
+
+        if !std::path::Path::new(&path).exists() {
+            return Err("Path validation failed: File no longer exists on disk.".to_string());
+        }
     }
 
     if is_url {

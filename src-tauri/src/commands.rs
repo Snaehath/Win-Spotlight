@@ -89,41 +89,200 @@ impl CommandRegistry {
 struct CalcPlugin;
 impl CommandPlugin for CalcPlugin {
     fn prefix(&self) -> &str { "calc" }
-    fn description(&self) -> &str { "Evaluate a math expression: > calc 10 * 3" }
+    fn description(&self) -> &str { "Evaluate a math expression: > calc (10 + 2) * 3" }
 
     fn execute(&self, args: &str) -> CommandResult {
         if args.is_empty() {
             // Launch Calculator app
             return CommandResult::Launch("calc.exe".to_string(), vec![]);
         }
-        // Safely evaluate simple integer-only expressions
-        match eval_simple(args) {
+        match eval_expression(args) {
             Some(result) => CommandResult::Display(format!("{} = {}", args, result)),
             None => CommandResult::Launch("calc.exe".to_string(), vec![]),
         }
     }
 }
 
-/// Simple safe evaluator for `a op b` style expressions (no exec/eval)
-pub fn eval_simple(expr: &str) -> Option<f64> {
-    let expr = expr.replace(' ', "");
-    let ops = ['+', '-', '*', '/'];
-    for op in ops {
-        if let Some(pos) = expr.rfind(op) {
-            if pos == 0 { continue; }
-            let left: f64 = expr[..pos].parse().ok()?;
-            let right: f64 = expr[pos + 1..].parse().ok()?;
-            return Some(match op {
-                '+' => left + right,
-                '-' => left - right,
-                '*' => left * right,
-                '/' => if right == 0.0 { return None; } else { left / right },
-                _ => return None,
-            });
+struct MathParser<'a> {
+    input: &'a [char],
+    pos: usize,
+}
+
+impl<'a> MathParser<'a> {
+    fn new(input: &'a [char]) -> Self {
+        MathParser { input, pos: 0 }
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.input.get(self.pos).copied()
+    }
+
+    fn consume(&mut self) -> Option<char> {
+        let c = self.peek();
+        if c.is_some() {
+            self.pos += 1;
+        }
+        c
+    }
+
+    fn skip_whitespace(&mut self) {
+        while let Some(c) = self.peek() {
+            if c.is_whitespace() {
+                self.consume();
+            } else {
+                break;
+            }
         }
     }
-    None
+
+    fn parse_expression(&mut self) -> Option<f64> {
+        let mut value = self.parse_term()?;
+        loop {
+            self.skip_whitespace();
+            match self.peek() {
+                Some('+') => {
+                    self.consume();
+                    let right = self.parse_term()?;
+                    value += right;
+                }
+                Some('-') => {
+                    self.consume();
+                    let right = self.parse_term()?;
+                    value -= right;
+                }
+                _ => break,
+            }
+        }
+        Some(value)
+    }
+
+    fn parse_term(&mut self) -> Option<f64> {
+        let mut value = self.parse_power()?;
+        loop {
+            self.skip_whitespace();
+            match self.peek() {
+                Some('*') => {
+                    self.consume();
+                    let right = self.parse_power()?;
+                    value *= right;
+                }
+                Some('/') => {
+                    self.consume();
+                    let right = self.parse_power()?;
+                    if right == 0.0 {
+                        return None; // Division by zero
+                    }
+                    value /= right;
+                }
+                _ => break,
+            }
+        }
+        Some(value)
+    }
+
+    fn parse_power(&mut self) -> Option<f64> {
+        let mut value = self.parse_factor()?;
+        self.skip_whitespace();
+        if let Some('^') = self.peek() {
+            self.consume();
+            let exponent = self.parse_power()?;
+            value = value.powf(exponent);
+        }
+        Some(value)
+    }
+
+    fn parse_factor(&mut self) -> Option<f64> {
+        self.skip_whitespace();
+        let c = self.peek()?;
+
+        // Unary signs
+        if c == '-' {
+            self.consume();
+            return self.parse_factor().map(|v| -v);
+        }
+        if c == '+' {
+            self.consume();
+            return self.parse_factor();
+        }
+
+        // Parentheses
+        if c == '(' {
+            self.consume();
+            let val = self.parse_expression()?;
+            self.skip_whitespace();
+            if self.consume()? != ')' {
+                return None;
+            }
+            return Some(val);
+        }
+
+        // Function calls or numbers
+        if c.is_alphabetic() {
+            let mut name = String::new();
+            while let Some(ch) = self.peek() {
+                if ch.is_alphabetic() {
+                    name.push(self.consume()?);
+                } else {
+                    break;
+                }
+            }
+            self.skip_whitespace();
+            if self.peek() == Some('(') {
+                self.consume(); // Consume '('
+                let arg = self.parse_expression()?;
+                self.skip_whitespace();
+                if self.consume()? != ')' {
+                    return None;
+                }
+                let lower_name = name.to_lowercase();
+                return Some(match lower_name.as_str() {
+                    "sqrt" => arg.sqrt(),
+                    "sin" => arg.sin(),
+                    "cos" => arg.cos(),
+                    "tan" => arg.tan(),
+                    "abs" => arg.abs(),
+                    "ln" => arg.ln(),
+                    "log" => arg.log10(),
+                    _ => return None,
+                });
+            }
+            return None;
+        }
+
+        // Parse number
+        let mut num_str = String::new();
+        let mut has_dot = false;
+        while let Some(ch) = self.peek() {
+            if ch.is_ascii_digit() {
+                num_str.push(self.consume()?);
+            } else if ch == '.' && !has_dot {
+                has_dot = true;
+                num_str.push(self.consume()?);
+            } else {
+                break;
+            }
+        }
+
+        if num_str.is_empty() {
+            None
+        } else {
+            num_str.parse().ok()
+        }
+    }
 }
+
+pub fn eval_expression(expr: &str) -> Option<f64> {
+    let chars: Vec<char> = expr.chars().collect();
+    let mut parser = MathParser::new(&chars);
+    let val = parser.parse_expression()?;
+    parser.skip_whitespace();
+    if parser.pos < chars.len() {
+        None
+    } else {
+        Some(val)
+    }
+}
+
 
 /// > g <search terms>  — Open default browser with a Google search
 struct WebSearchPlugin;

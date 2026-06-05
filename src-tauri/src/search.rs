@@ -1,7 +1,7 @@
 use crate::history::HistoryManager;
 use crate::indexer::SearchItem;
 use crate::ranking::{compute_score, ScoredItem, rank};
-use crate::commands::{CommandRegistry, CommandResult, eval_simple};
+use crate::commands::{CommandRegistry, CommandResult, eval_expression};
 use crate::index_engine::IndexEngine;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -288,9 +288,9 @@ fn detect_ambient_intent(
     let q = query.trim().to_lowercase();
     let is_empty = q.is_empty();
 
-    // ── Math: detect `<number> <op> <number>` patterns ───────────────────────
+    // ── Math: detect math expression patterns ───────────────────────────────
     if !is_empty && is_math_expression(query) {
-        if let Some(result) = eval_simple(query) {
+        if let Some(result) = eval_expression(query) {
             let formatted = if result.fract() == 0.0 {
                 format!("{}", result as i64)
             } else {
@@ -411,19 +411,24 @@ fn detect_ambient_intent(
     // ── Currency Conversion ───────────────────────────────────────────────────
     results.append(&mut crate::currency::detect_currency_intent(query));
 
+    // ── System HUD Intent ─────────────────────────────────────────────────────
+    if q == "sys:" || q == "system" || q == "sys" {
+        results.append(&mut crate::system_info::get_system_stats());
+    }
+
     results
 }
 
 /// Returns true if the query looks like a math expression.
-/// Supports: `5 + 5`, `100/4`, `12 * 3.5`, `100 - 20`
+/// Supports arithmetic, parentheses, power (^), and functions like sqrt, sin, cos, tan, abs, ln, log.
 fn is_math_expression(query: &str) -> bool {
-    let s = query.replace(' ', "");
-    // Must contain an operator and start with a digit or minus
-    let has_op = s.contains('+') || s.contains('*') || s.contains('/') ||
+    let s = query.replace(' ', "").to_lowercase();
+    let has_op = s.contains('+') || s.contains('*') || s.contains('/') || s.contains('^') ||
+        s.contains("sqrt") || s.contains("sin") || s.contains("cos") || s.contains("tan") ||
+        s.contains("abs") || s.contains("ln") || s.contains("log") ||
         (s.contains('-') && s.find('-').is_some_and(|i| i > 0));
     if !has_op { return false; }
-    // Must be mostly numeric
-    s.chars().all(|c| c.is_ascii_digit() || c == '.' || c == '+' || c == '-' || c == '*' || c == '/')
+    s.chars().all(|c| c.is_ascii_digit() || c == '.' || c == '+' || c == '-' || c == '*' || c == '/' || c == '^' || c == '(' || c == ')' || c.is_ascii_lowercase())
 }
 
 // ── Explicit Command handler (> prefix) ──────────────────────────────────────

@@ -154,8 +154,19 @@ window.addEventListener("DOMContentLoaded", () => {
     render();
   });
 
-  // ── Auto-hide on blur ────────────────────────────────────────────────────
-  window.addEventListener("blur", () => invoke("hide_window"));
+  // ── Auto-hide on blur with debounce ──────────────────────────────────────
+  let blurTimeout;
+  window.addEventListener("blur", () => {
+    blurTimeout = setTimeout(() => {
+      invoke("hide_window");
+    }, 150);
+  });
+
+  window.addEventListener("focus", () => {
+    if (blurTimeout) {
+      clearTimeout(blurTimeout);
+    }
+  });
 
   // ── Auto-clear and focus on window show ──────────────────────────────────
   if (window.__TAURI__ && window.__TAURI__.event) {
@@ -314,20 +325,25 @@ async function launchSelected(path, e) {
 async function saveShortcutAndReset() {
   const alias = searchInput.value.trim();
   if (alias && pendingShortcutUrl) {
-    await invoke("save_shortcut", { alias, url: pendingShortcutUrl });
+    try {
+      await invoke("save_shortcut", { alias, url: pendingShortcutUrl });
 
-    // Reset UI
-    currentMode = "SEARCH";
-    searchInput.placeholder = "Search...";
-    searchInput.value = "";
-    pendingShortcutUrl = "";
+      // Reset UI
+      currentMode = "SEARCH";
+      searchInput.placeholder = "Search...";
+      searchInput.value = "";
+      pendingShortcutUrl = "";
 
-    // Refresh to show newly added shortcut if it matches empty query (recents)
-    const res = await invoke("search_items", { query: "" });
-    currentResults = sortByPriority(res);
-    render();
+      // Refresh to show newly added shortcut if it matches empty query (recents)
+      const res = await invoke("search_items", { query: "" });
+      currentResults = sortByPriority(res);
+      render();
+    } catch (err) {
+      alert("Failed to save shortcut: " + err);
+    }
   }
 }
+
 
 async function revealSelected(path) {
   if (!path || path.startsWith("COMMAND:")) return;

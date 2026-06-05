@@ -134,6 +134,11 @@ export function renderResults(
       if (item.category !== "RECENT") {
         forgetBtn.style.display = "none";
       }
+    } else {
+      const actionBar = li.querySelector(".action-bar");
+      if (actionBar) {
+        actionBar.style.display = "none";
+      }
     }
 
     resultsList.appendChild(li);

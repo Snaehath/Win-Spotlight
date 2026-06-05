@@ -55,9 +55,20 @@ impl ShortcutManager {
 }
 
 #[tauri::command]
-pub fn save_shortcut(alias: String, url: String, manager: tauri::State<'_, ShortcutManager>) {
-    manager.add(alias, url);
+pub fn save_shortcut(
+    alias: String,
+    url: String,
+    manager: tauri::State<'_, ShortcutManager>
+) -> Result<(), String> {
+    let url_trimmed = url.trim();
+    let lower_url = url_trimmed.to_lowercase();
+    if !lower_url.starts_with("http://") && !lower_url.starts_with("https://") && !lower_url.starts_with("mailto:") {
+        return Err("Invalid protocol: Only http://, https://, and mailto: are allowed for shortcuts.".to_string());
+    }
+    manager.add(alias, url_trimmed.to_string());
+    Ok(())
 }
+
 
 #[tauri::command]
 pub fn clear_shortcuts(

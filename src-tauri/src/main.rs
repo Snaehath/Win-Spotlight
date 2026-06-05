@@ -14,6 +14,7 @@ mod commands;
 mod index_engine;
 mod watcher;
 mod currency;
+mod system_info;
 
 use std::sync::{Arc, Mutex};
 use indexer::{scan_items, get_base_scan_paths};
@@ -156,8 +157,8 @@ fn main() {
                     .into_iter()
                     .filter(|p: &std::path::PathBuf| {
                         // Don't watch drive roots (e.g. "C:\") recursively!
-                        // That is the primary cause of high CPU.
-                        p.components().count() > 1 
+                        // That is the primary cause of high CPU. Drive roots have no parent component.
+                        p.parent().is_some() 
                     })
                     .map(|p: std::path::PathBuf| p.to_string_lossy().to_string())
                     .collect();
