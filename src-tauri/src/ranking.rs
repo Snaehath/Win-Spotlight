@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn test_exponential_recency_decay() {
-        let now = 1_000_000u64;
+        let now = 1_700_000_000u64;
         let day_secs = 86_400u64;
 
         // 0 days ago -> recency component 1.0
