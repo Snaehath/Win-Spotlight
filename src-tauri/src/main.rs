@@ -140,10 +140,10 @@ fn main() {
             // ── Initial bulk index & Vacuum (background — non-blocking) ─────
             {
                 let engine_clone = engine.clone();
-                let needs_index = !index_dir.join("meta.json").exists();
                 let initial_items = cache_arc.lock().unwrap().clone();
                 std::thread::spawn(move || {
-                    if needs_index {
+                    let num_docs = engine_clone.reader.searcher().num_docs();
+                    if num_docs == 0 || num_docs != initial_items.len() as u64 {
                         let _ = engine_clone.bulk_add(&initial_items);
                     }
                     

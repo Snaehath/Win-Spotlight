@@ -124,10 +124,32 @@ impl IndexEngine {
     }
 
     pub fn bulk_add(&self, items: &[SearchItem]) -> tantivy::Result<()> {
+        let s = &self.schema;
+        let mut writer = self.writer.lock().unwrap();
         for item in items {
-            self.upsert(item)?;
+            let path_term = Term::from_field_text(s.f_path, &item.path);
+            writer.delete_term(path_term);
+
+            let item_type_str = match item.item_type {
+                ItemType::App    => "app",
+                ItemType::File   => "file",
+                ItemType::Folder => "folder",
+            };
+            let icon_val = item.icon.clone().unwrap_or_default();
+
+            let new_doc = doc!(
+                s.f_name => item.name.clone(),
+                s.f_path => item.path.clone(),
+                s.f_item_type => item_type_str,
+                s.f_category => item.category.clone(),
+                s.f_icon => icon_val,
+            );
+            writer.add_document(new_doc)?;
         }
-        self.commit()
+        writer.commit()?;
+        drop(writer);
+        self.reader.reload()?;
+        Ok(())
     }
 
     pub fn remove_by_path(&self, path: &str) -> tantivy::Result<()> {
@@ -139,6 +161,7 @@ impl IndexEngine {
 
     pub fn commit(&self) -> tantivy::Result<()> {
         self.writer.lock().unwrap().commit()?;
+        self.reader.reload()?;
         Ok(())
     }
 

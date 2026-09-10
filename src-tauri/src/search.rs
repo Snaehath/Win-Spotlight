@@ -570,5 +570,32 @@ mod tests {
         assert_eq!(url_actions.len(), 1, "URL typing must yield exactly 1 focused action");
         assert!(url_actions[0].item.name.starts_with("Open github.com"));
     }
+
+    #[test]
+    fn test_tantivy_indexes_and_retrieves_files_and_folders() {
+        let temp_dir = std::env::temp_dir().join(format!("spotlight_tantivy_test_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let engine = crate::index_engine::IndexEngine::open(&temp_dir).unwrap();
+        let items = vec![
+            SearchItem::new("Quarterly Report".to_string(), "C:\\Docs\\report.pdf".to_string(), None, crate::indexer::ItemType::File, "DOC".to_string()),
+            SearchItem::new("Vacation Photos".to_string(), "C:\\Pictures\\Vacation".to_string(), None, crate::indexer::ItemType::Folder, "FOLDER".to_string()),
+            SearchItem::new("Intro Video".to_string(), "C:\\Videos\\intro.mp4".to_string(), None, crate::indexer::ItemType::File, "VID".to_string()),
+        ];
+        engine.bulk_add(&items).unwrap();
+        assert_eq!(engine.reader.searcher().num_docs(), 3);
+
+        let report_cand = engine.search_candidates("report", 5);
+        assert_eq!(report_cand.len(), 1);
+        assert_eq!(report_cand[0].0, "C:\\Docs\\report.pdf");
+
+        let folder_cand = engine.search_candidates("vacation", 5);
+        assert_eq!(folder_cand.len(), 1);
+        assert_eq!(folder_cand[0].0, "C:\\Pictures\\Vacation");
+
+        let video_cand = engine.search_candidates("intro", 5);
+        assert_eq!(video_cand.len(), 1);
+        assert_eq!(video_cand[0].0, "C:\\Videos\\intro.mp4");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
 }
 
