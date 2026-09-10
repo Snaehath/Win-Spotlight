@@ -72,6 +72,7 @@ We follow a strict interaction philosophy: **One search box. One obvious answer.
 | <kbd>Enter</kbd> | Do the obvious thing (open top result) |
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Move selection |
 | <kbd>Shift</kbd> + <kbd>Enter</kbd> | Reveal selected file in Windows Explorer |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> | Copy selected item path to clipboard |
 | <kbd>Alt</kbd> + <kbd>Enter</kbd> | Forget item from recent history |
 | <kbd>Esc</kbd> | Get me out (close window) |
 
@@ -83,9 +84,11 @@ We follow a strict interaction philosophy: **One search box. One obvious answer.
 
 Spotlight-Win combines a responsive web frontend with a high-performance native Rust core via Tauri v2:
 
-- **Sub-Microsecond Scoring**: Ranking combines fuzzy text matching, direct prefix bonuses, app prioritization, launch frequency, and time-of-day relevance in memory.
-- **In-Memory Caching**: Extracted Windows binary icons and file records are kept in memory with disk persistence, avoiding disk I/O during keystrokes.
-- **Debounced Incremental Watcher**: Real-time filesystem changes (Desktop, Start Menu, User Folders) update the in-memory cache dynamically without SSD thrashing.
+- **Two-Stage Retrieval & Hard Bounding**: Tantivy inverted index retrieves candidate matches in sub-millisecond time. The ranking hot path is strictly bounded to $\le 48 \text{ candidates} + \approx 200 \text{ installed apps}$, completely decoupling index size from keystroke latency.
+- **Decoupled Personal Composite Ranking**: Final results are scored across **Match Quality** (70%), **Personal Profile** (25% with 7-day half-life exponential recency decay and logarithmic frequency), and **Context** (5%).
+- **Self-Healing State Recovery**: Transparent automatic reconstruction of derived index files on unexpected process termination or corruption—zero error popups or manual user fixes required.
+- **In-Memory Caching & $O(1)$ Mapping**: Extracted Windows binary icons, precomputed normalized names, acronyms, and path lookup maps avoid disk I/O and per-keystroke allocations.
+- **Debounced Incremental Watcher**: Real-time filesystem changes (Desktop, Start Menu, User Folders) batch-update without UI stutter or SSD thrashing.
 - **Failsafe System Actions**: Destructive actions (shutdown, restart) require deliberate keywords and trigger confirmation prompts before execution.
 
 ---
@@ -96,11 +99,16 @@ Spotlight-Win combines a responsive web frontend with a high-performance native 
 - [Rust](https://www.rust-lang.org/tools/install) (1.78+)
 - [Node.js](https://nodejs.org/) (v18+) & `npm`
 
-### Local Development
+### Local Development & Testing
 ```bash
 git clone https://github.com/Snaehath/Win-Spotlight.git
 cd Win-Spotlight
 npm install
+
+# Run automated product invariant and benchmark test suite
+npm test
+
+# Launch dev server
 npm run tauri dev
 ```
 
@@ -116,10 +124,12 @@ Standalone setup files and binaries will be generated in `src-tauri/target/relea
 
 Rather than adding endless features, our current milestone is focused entirely on **production hardening, reliability, and friction removal**:
 
-- [ ] **Search Ranking Perfection**: Continuous tuning so the top result is undeniably what you meant on the first keystroke.
+- [x] **Bounded Two-Stage Search**: Tantivy candidate retrieval with bounded personal ranking and zero-allocation metadata.
+- [x] **Self-Healing Index Recovery**: Automatic recovery from unexpected termination and corrupt cache states.
+- [x] **Automated Regression Suite**: 8 product invariant tests covering scoring separation, exponential recency, acronyms, and safeguards.
+- [ ] **End-to-End Latency Verification**: Real-world dogfooding measuring p50 (<50ms) / p95 (<100ms) / p99 keypress-to-paint times.
 - [ ] **Edge-Case Resilience**: Seamless behavior across multi-monitor setups, high-DPI scaling (125%, 150%, 200%), and Windows sleep/wake cycles.
 - [ ] **Zero-Friction Installer**: Smooth one-click install/uninstall experience for everyday users.
-- [ ] **High-Scale Indexing**: Everything SDK / USN Journal integration to scale across 1M+ files with zero UI latency.
 - [ ] **Clipboard History**: Clean, unobtrusive search-and-paste clipboard workflow.
 
 ---
