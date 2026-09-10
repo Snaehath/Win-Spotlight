@@ -201,7 +201,8 @@ impl IndexEngine {
         // Build prefix RegexQuery for each token (e.g. "aqua.*")
         let mut subqueries: Vec<(Occur, Box<dyn Query>)> = Vec::new();
         for t in &tokens {
-            let pattern = format!("{}.*", t.to_lowercase());
+            let escaped = regex::escape(&t.to_lowercase());
+            let pattern = format!("{}.*", escaped);
             if let Ok(rq) = RegexQuery::from_pattern(&pattern, s.f_name) {
                 subqueries.push((Occur::Must, Box::new(rq)));
             }

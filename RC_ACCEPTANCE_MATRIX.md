@@ -10,37 +10,37 @@ This document defines the formal exit criteria for **Spotlight-Win v1.0 Release 
 ## 📋 Acceptance Criteria Matrix
 
 ### 1. Runtime & Latency
-- [ ] **Hotkey Reliability**: <kbd>Ctrl</kbd> + <kbd>Space</kbd> reliably summons the launcher window in < 50ms from warm state.
-- [ ] **First Keystroke Acceptance**: The first character typed immediately following hotkey invocation is never dropped or delayed.
+- [x] **Hotkey Reliability**: <kbd>Ctrl</kbd> + <kbd>Space</kbd> reliably summons the launcher window in < 50ms from warm state.
+- [x] **First Keystroke Acceptance**: The first character typed immediately following hotkey invocation is never dropped or delayed.
 - [ ] **Warm Latency SLA**:
   - [ ] p50 < 50 ms (keypress to UI paint)
   - [ ] p95 < 100 ms
   - [ ] p99 < 150 ms
-- [ ] **Burst Typing Concurrency**: Rapid continuous typing (`c → ch → chr → chrom → chrome`) discards obsolete asynchronous responses via query ID tracking without UI flicker or stale results.
-- [ ] **Single Activation Invariant**:
-  - [ ] Holding <kbd>Enter</kbd> launches the selected target at most once (OS `e.repeat` discarded).
-  - [ ] Rapid physical double-tapping of <kbd>Enter</kbd> launches at most once (`isActivating` session lock).
-  - [ ] Opening a new launcher session (<kbd>Ctrl</kbd> + <kbd>Space</kbd> / `window-shown`) cleanly resets the lock.
+- [x] **Burst Typing Concurrency**: Rapid continuous typing (`c → ch → chr → chrom → chrome`) discards obsolete asynchronous responses via query ID tracking without UI flicker or stale results.
+- [x] **Single Activation Invariant**:
+  - [x] Holding <kbd>Enter</kbd> launches the selected target at most once (OS `e.repeat` discarded).
+  - [x] Rapid physical double-tapping of <kbd>Enter</kbd> launches at most once (`isActivating` session lock).
+  - [x] Opening a new launcher session (<kbd>Ctrl</kbd> + <kbd>Space</kbd> / `window-shown`) cleanly resets the lock.
 
 ---
 
 ### 2. Search Correctness & Relevance
-- [ ] **Exact Match Priority**: Exact application name match strictly tops results over partial, prefix, or fuzzy matches.
-- [ ] **Prefix over Fuzzy**: Substring prefix matches always score above mid-string or fuzzy matches.
-- [ ] **Acronym Matching**: Short acronym queries (`vs` $\to$ Visual Studio Code, `cmd` $\to$ Command Prompt) score deterministically.
-- [ ] **Folder Search Cleanliness**: Paths containing `.`, `_`, or standard directory separators display clean, natural folder names.
-- [ ] **Bounded Candidate Invariant**: Single-letter queries (`a`, `c`, `s`, `m`) remain bounded ($\le 48$ Tantivy candidates) without unbounded allocations or latency spikes.
-- [ ] **Focused Web & URL Action**: Entering full or partial URLs (`https://`, `.com`) surfaces a single clear browser navigation action.
-- [ ] **Math & Unit Intent**: Valid mathematical expressions (`128 * 4`, `sqrt(144)`) evaluate inline without external subprocess overhead.
-- [ ] **Destructive Safeguards**: Critical system actions (`shutdown`, `restart`) require explicit keywords and prompt confirmation dialogs before execution.
+- [x] **Exact Match Priority**: Exact application name match strictly tops results over partial, prefix, or fuzzy matches.
+- [x] **Prefix over Fuzzy**: Substring prefix matches always score above mid-string or fuzzy matches.
+- [x] **Acronym Matching**: Short acronym queries (`vs` $\to$ Visual Studio Code, `cmd` $\to$ Command Prompt) score deterministically.
+- [x] **Folder Search Cleanliness**: Paths containing `.`, `_`, or standard directory separators display clean, natural folder names.
+- [x] **Bounded Candidate Invariant**: Single-letter queries (`a`, `c`, `s`, `m`) remain bounded ($\le 48$ Tantivy candidates) without unbounded allocations or latency spikes.
+- [x] **Focused Web & URL Action**: Entering full or partial URLs (`https://`, `.com`) surfaces a single clear browser navigation action.
+- [x] **Math & Unit Intent**: Valid mathematical expressions (`128 * 4`, `sqrt(144)`) evaluate inline without external subprocess overhead.
+- [x] **Destructive Safeguards**: Critical system actions (`shutdown`, `restart`) require explicit keywords and prompt confirmation dialogs before execution.
 
 ---
 
 ### 3. Resilience & Crash Recovery
-- [ ] **Missing Index**: Wiping `%APPDATA%/spotlight-win/index` prompts transparent, silent background index regeneration.
+- [ ] **Missing Index**: Wiping `%APPDATA%/com.spotlight.launcher/spotlight_index` prompts transparent, silent background index regeneration.
 - [ ] **Corrupt Index Recovery**: Writing invalid bytes into `meta.json` or segments recovers automatically without crashing or showing error dialogs.
 - [ ] **Stale Process Locks**: Dead process `.lock` files in Tantivy directory are cleaned and healed on launch.
-- [ ] **User State Preservation**: Corrupt `history_v2.json` creates a timestamped `history_v2.corrupt.<timestamp>.json` backup before resetting in-memory records.
+- [x] **User State Preservation**: Corrupt `history_v2.json` creates a timestamped `history_v2.corrupt.<timestamp>.json` backup before resetting in-memory records.
 - [ ] **Hard Process Kill During Indexing**: Terminating the process mid-write (`taskkill /f /im spotlight-win.exe`) results in automatic self-healing on next start.
 - [ ] **Hard Process Kill During Launch**: Process termination during application launch leaves no corrupt lock states.
 

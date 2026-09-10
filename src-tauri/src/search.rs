@@ -584,13 +584,24 @@ mod tests {
         engine.bulk_add(&items).unwrap();
         assert_eq!(engine.reader.searcher().num_docs(), 4);
 
+        // 1. Prefix query
         let aqua_cand = engine.search_candidates("aqua", 5);
         assert_eq!(aqua_cand.len(), 1, "aqua should match aquaFlow via prefix!");
         assert_eq!(aqua_cand[0].0, "D:\\DevelopmentSide\\React Native\\aquaFlow");
 
-        let report_cand = engine.search_candidates("report", 5);
-        assert_eq!(report_cand.len(), 1);
-        assert_eq!(report_cand[0].0, "C:\\Docs\\report.pdf");
+        // 2. Full exact term query
+        let full_cand = engine.search_candidates("aquaFlow", 5);
+        assert_eq!(full_cand.len(), 1, "aquaFlow exact should match!");
+
+        // 3. Multi-token conjunctive query
+        let multi_cand = engine.search_candidates("quarterly rep", 5);
+        assert_eq!(multi_cand.len(), 1, "Multi-token 'quarterly rep' should match Quarterly Report!");
+        assert_eq!(multi_cand[0].0, "C:\\Docs\\report.pdf");
+
+        // 4. Safe regex escaping: metacharacters should not panic or produce invalid regex
+        let safe_cand = engine.search_candidates("report(1)+[test]?", 5);
+        // Should safely execute search without regex errors
+        let _ = safe_cand;
 
         let folder_cand = engine.search_candidates("vacation", 5);
         assert_eq!(folder_cand.len(), 1);
