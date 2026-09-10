@@ -2,13 +2,16 @@ pub mod icons;
 pub mod scanner;
 pub mod cache;
 
-use std::path::{PathBuf};
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use serde::Serialize;
 use directories::UserDirs;
 
-pub use icons::{ICON_FOLDER, get_file_category_and_icon, get_app_icon};
-pub use scanner::{get_base_scan_paths, should_skip_directory};
+pub use icons::{
+    ICON_FOLDER,
+    get_file_category_and_icon, get_app_icon
+};
+pub use scanner::{get_base_scan_paths, should_skip_directory, is_ignored_path};
 pub use cache::IconCache;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -27,6 +30,80 @@ pub struct SearchItem {
     pub category: String,
 }
 
+/// Unified classifier for files, apps, and folders across both scanner and watcher
+pub fn classify_path(path: &Path, cache: Option<&IconCache>) -> Option<SearchItem> {
+    let name = path.file_name().and_then(|s| s.to_str())?;
+    if name.is_empty() || name.starts_with('.') {
+        return None;
+    }
+
+    if path.is_dir() {
+        let parent_name = path
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+        let display_name = if !parent_name.is_empty() {
+            format!("{} > {}", parent_name, name)
+        } else {
+            name.to_string()
+        };
+
+        return Some(SearchItem {
+            name: display_name,
+            path: path.to_string_lossy().to_string(),
+            icon: Some(ICON_FOLDER.to_string()),
+            item_type: ItemType::Folder,
+            category: "FOLDER".to_string(),
+        });
+    }
+
+    let path_str = path.to_string_lossy().to_string();
+    let ext = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    if ext == "lnk" || ext == "exe" {
+        let stem = path.file_stem().and_then(|s| s.to_str())?;
+        if stem.to_lowercase().contains("uninstall") {
+            return None;
+        }
+
+        let icon = if let Some(c) = cache {
+            if let Some(cached) = c.get(&path_str) {
+                Some(cached)
+            } else {
+                let extracted = get_app_icon(path);
+                if let Some(ref icon_b64) = extracted {
+                    c.set(&path_str, icon_b64);
+                }
+                extracted
+            }
+        } else {
+            get_app_icon(path)
+        };
+
+        Some(SearchItem {
+            name: stem.to_string(),
+            path: path_str,
+            icon,
+            item_type: ItemType::App,
+            category: "APP".to_string(),
+        })
+    } else {
+        let (cat_str, icon) = get_file_category_and_icon(path);
+        Some(SearchItem {
+            name: name.to_string(),
+            path: path_str,
+            icon,
+            item_type: ItemType::File,
+            category: cat_str,
+        })
+    }
+}
+
 // scanner
 pub fn scan_items(cache: Option<&IconCache>) -> Vec<SearchItem> {
     let mut items = Vec::new();
@@ -40,7 +117,7 @@ pub fn scan_items(cache: Option<&IconCache>) -> Vec<SearchItem> {
         let is_start_menu = path_str.contains("Start Menu");
         let is_system_root = path_str == format!("{}\\", system_drive) || path_str == system_drive;
         
-        let max_depth = if is_start_menu { 5 } else if is_system_root { 2 } else { 5 };
+        let max_depth = if is_start_menu { 5 } else if is_system_root { 2 } else { 4 };
 
         let walker = WalkDir::new(&path)
             .max_depth(max_depth)
@@ -51,111 +128,40 @@ pub fn scan_items(cache: Option<&IconCache>) -> Vec<SearchItem> {
             });
 
         for entry in walker.filter_map(|e| e.ok()) {
+            if entry.depth() == 0 { continue; }
             let file_path = entry.path();
-            let name = file_path.file_name().and_then(|s| s.to_str()).unwrap_or("");
-            if name.is_empty() || name.starts_with('.') { continue; }
-
-            if file_path.is_file() {
-                let ext = file_path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
-                
-                if ext == "lnk" || ext == "exe" {
-                    if let Some(stem) = file_path.file_stem().and_then(|s| s.to_str()) {
-                        if stem.to_lowercase().contains("uninstall") { continue; }
-                        
-                        let path_str = file_path.to_string_lossy().to_string();
-                        
-                        // Use IconCache
-                        let icon = if let Some(c) = cache {
-                            if let Some(cached) = c.get(&path_str) {
-                                Some(cached)
-                            } else {
-                                let extracted = get_app_icon(file_path);
-                                if let Some(ref icon_b64) = extracted {
-                                    c.set(&path_str, icon_b64);
-                                }
-                                extracted
-                            }
-                        } else {
-                            get_app_icon(file_path)
-                        };
-
-                        items.push(SearchItem {
-                            name: stem.to_string(),
-                            path: path_str,
-                            icon,
-                            item_type: ItemType::App,
-                            category: "APP".to_string(),
-                        });
-                    }
-                } else {
-                    let (cat_str, icon) = get_file_category_and_icon(file_path);
-                    if cat_str != "FILE" || ext == "txt" || ext == "md" {
-                        items.push(SearchItem {
-                            name: name.to_string(),
-                            path: file_path.to_string_lossy().to_string(),
-                            icon,
-                            item_type: ItemType::File,
-                            category: cat_str,
-                        });
-                    }
-                }
-            } else if file_path.is_dir() && entry.depth() > 0 {
-                let parent_name = file_path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()).unwrap_or("");
-                let display_name = if !parent_name.is_empty() && entry.depth() > 3 {
-                    format!("{} > {}", parent_name, name)
-                } else {
-                    name.to_string()
-                };
-
-                items.push(SearchItem {
-                    name: display_name,
-                    path: file_path.to_string_lossy().to_string(),
-                    icon: Some(ICON_FOLDER.to_string()),
-                    item_type: ItemType::Folder,
-                    category: "FOLDER".to_string(),
-                });
+            if let Some(item) = classify_path(file_path, cache) {
+                items.push(item);
             }
         }
     }
 
-    // SCAN USER FOLDERS
+    // SCAN USER DIRECTORIES (Documents, Downloads, Pictures, Videos, Music)
     if let Some(user_dirs) = UserDirs::new() {
         let folders = vec![
-            (user_dirs.download_dir(), "Downloads"),
-            (user_dirs.document_dir(), "Documents"),
-            (user_dirs.picture_dir(), "Pictures"),
+            user_dirs.download_dir(),
+            user_dirs.document_dir(),
+            user_dirs.picture_dir(),
+            user_dirs.video_dir(),
+            user_dirs.audio_dir(),
         ];
 
-        for (dir_opt, cat) in folders {
+        for dir_opt in folders {
             if let Some(path) = dir_opt {
                 if !path.exists() { continue; }
-                let walker = WalkDir::new(path).max_depth(2).into_iter().filter_entry(|e| {
-                    let name = e.file_name().to_str().unwrap_or("");
-                    !should_skip_directory(name, e.depth())
-                });
+                let walker = WalkDir::new(path)
+                    .max_depth(3)
+                    .into_iter()
+                    .filter_entry(|e| {
+                        let name = e.file_name().to_str().unwrap_or("");
+                        !should_skip_directory(name, e.depth())
+                    });
 
                 for entry in walker.filter_map(|e| e.ok()) {
+                    if entry.depth() == 0 { continue; }
                     let file_path = entry.path();
-                    let name = file_path.file_name().and_then(|s| s.to_str()).unwrap_or("");
-                    if name.is_empty() || name.starts_with('.') { continue; }
-
-                    if file_path.is_dir() {
-                        items.push(SearchItem {
-                            name: name.to_string(),
-                            path: file_path.to_string_lossy().to_string(),
-                            icon: Some(ICON_FOLDER.to_string()),
-                            item_type: ItemType::Folder,
-                            category: cat.to_uppercase(),
-                        });
-                    } else {
-                        let (cat_str, icon) = get_file_category_and_icon(file_path);
-                        items.push(SearchItem {
-                            name: name.to_string(),
-                            path: file_path.to_string_lossy().to_string(),
-                            icon,
-                            item_type: ItemType::File,
-                            category: cat_str,
-                        });
+                    if let Some(item) = classify_path(file_path, cache) {
+                        items.push(item);
                     }
                 }
             }
@@ -172,13 +178,15 @@ pub fn scan_items(cache: Option<&IconCache>) -> Vec<SearchItem> {
         ("Notepad", sys32.join("notepad.exe")),
         ("Paint", sys32.join("mspaint.exe")),
         ("PowerShell", sys32.join("WindowsPowerShell\\v1.0\\powershell.exe")),
+        ("Task Manager", sys32.join("Taskmgr.exe")),
+        ("Device Manager", sys32.join("devmgmt.msc")),
+        ("Registry Editor", PathBuf::from(&system_root).join("regedit.exe")),
     ];
 
     for (tool_name, tool_path) in common_tools {
         if tool_path.exists() {
             let path_str = tool_path.to_string_lossy().to_string();
             
-            // Use IconCache
             let icon = if let Some(c) = cache {
                 if let Some(cached) = c.get(&path_str) {
                     Some(cached)

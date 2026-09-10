@@ -117,27 +117,27 @@ fn main() {
             // ── Icon Cache ──────────────────────────────────────────────────
             let icon_cache = Arc::new(indexer::IconCache::new(app.handle()));
 
-            // ── Initial crawl & Vacuum (background — non-blocking) ─────────────
+            // ── In-memory cache for instant first-keystroke response ────────
+            let items = scan_items(Some(&icon_cache));
+            let cache_arc = Arc::new(Mutex::new(items));
+            app.manage(AppCache {
+                apps: cache_arc.clone(),
+            });
+
+            // ── Initial bulk index & Vacuum (background — non-blocking) ─────
             {
                 let engine_clone = engine.clone();
-                let icon_cache_clone = icon_cache.clone();
                 let needs_index = !index_dir.join("meta.json").exists();
+                let initial_items = cache_arc.lock().unwrap().clone();
                 std::thread::spawn(move || {
                     if needs_index {
-                        let items = scan_items(Some(&icon_cache_clone));
-                        let _ = engine_clone.bulk_add(&items);
+                        let _ = engine_clone.bulk_add(&initial_items);
                     }
                     
                     // Run a disk vacuum on every boot to prune old tantivy cache
                     engine_clone.vacuum();
                 });
             }
-
-            // ── In-memory cache for instant first-keystroke response ────────
-            let items = scan_items(Some(&icon_cache));
-            app.manage(AppCache {
-                apps: Mutex::new(items.clone()),
-            });
 
             // ── Global Shortcut Enabled State ──────────────────────────────
             app.manage(ShortcutEnabled(Arc::new(Mutex::new(true))));
@@ -150,8 +150,6 @@ fn main() {
 
             // ── File watcher (background) ──────────────────────────────────
             {
-                let cache_arc: Arc<Mutex<Vec<_>>> = Arc::new(Mutex::new(items));
-                
                 // Get refined paths (Start Menu, Desktop, etc.) instead of raw drive roots
                 let watch_paths: Vec<String> = get_base_scan_paths()
                     .into_iter()
@@ -165,7 +163,7 @@ fn main() {
 
                 watcher::start_watcher(
                     engine.clone(),
-                    cache_arc,
+                    cache_arc.clone(),
                     icon_cache.clone(),
                     watch_paths,
                 );

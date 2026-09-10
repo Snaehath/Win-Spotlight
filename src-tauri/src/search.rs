@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 
 pub struct AppCache {
-    pub apps: Mutex<Vec<SearchItem>>,
+    pub apps: Arc<Mutex<Vec<SearchItem>>>,
 }
 
 pub struct IndexState(pub Arc<IndexEngine>);
@@ -40,7 +40,7 @@ pub fn search_items(
     state: State<'_, AppCache>,
     history_manager: State<'_, HistoryManager>,
     shortcut_manager: State<'_, crate::shortcuts::ShortcutManager>,
-    index_state: State<'_, IndexState>,
+    _index_state: State<'_, IndexState>,
     cmd_state: State<'_, CommandState>,
 ) -> Vec<SearchResult> {
     let query_trimmed = query.trim();
@@ -72,77 +72,18 @@ pub fn search_items(
     let items = state.apps.lock().unwrap();
     let matcher = SkimMatcherV2::default();
 
-    // ── 2. Empty query: show filter suggestions + recents ──────────────────
+    // ── 2. Empty query: show recents ───────────────────────────────────────
     // Note: We skip this early return if the `command:` filter is active, 
     // so we can show the full command list even with an empty query.
     if actual_query.is_empty() && forced_category != Some("COMMAND") {
-        let history = history_manager.load();
-        let mut final_results: Vec<SearchResult> = Vec::new();
-
-        // ── 2a. Inject Filter Suggestions ────────────────────────────────────
-        // Only show these if no specific filter is already active
-        if forced_category.is_none() && forced_item_type.is_none() {
-            let suggestions = vec![
-                ("app:", "Search Apps", "monitor"),
-                ("file:", "Search Files", "file-text"),
-                ("folder:", "Search Folders", "folder"),
-                ("command:", "Search Commands", "terminal"),
-            ];
-
-            for (prefix, label, icon) in suggestions {
-                final_results.push(SearchResult::from(SearchItem {
-                    name: label.to_string(),
-                    path: prefix.to_string(),
-                    icon: Some(icon.to_string()),
-                    item_type: crate::indexer::ItemType::File,
-                    category: "FILTER".to_string(), // New category for special styling
-                }));
-            }
-        }
-
-        // ── 2b. Add Recents ──────────────────────────────────────────────────
-        let mut recents_count = 0;
-        for record in history.records.iter() {
-            if recents_count >= 5 { break; }
-
-            let item = if record.path.starts_with("COMMAND:") {
-                // Commands are generally not filtered by keywords
-                if forced_category.is_some() || forced_item_type.is_some() { continue; }
-
-                // Synthetic command item
-                let name = if record.path.contains("> health") { "System Health" } 
-                          else if record.path.contains("> sys") { "System Action" }
-                          else { "Recent Action" };
-                Some(crate::indexer::SearchItem {
-                    name: format!("⚡ {}", name),
-                    path: record.path.clone(),
-                    icon: None,
-                    item_type: crate::indexer::ItemType::File,
-                    category: "RECENT".to_string(),
-                })
-            } else {
-                items.iter().find(|i| i.path == record.path).and_then(|cached| {
-                    // Apply filtering to recents too!
-                    if let Some(cat) = forced_category {
-                        if cached.category != cat { return None; }
-                    }
-                    if let Some(ref itype) = forced_item_type {
-                        if cached.item_type != *itype { return None; }
-                    }
-                    
-                    let mut recent_item = cached.clone();
-                    recent_item.category = "RECENT".to_string();
-                    Some(recent_item)
-                })
-            };
-
-            if let Some(res_item) = item {
-                final_results.push(SearchResult::from(res_item));
-                recents_count += 1;
-            }
-        }
-
-        return final_results;
+        return build_recents(
+            &history_manager,
+            &items,
+            forced_category,
+            forced_item_type.as_ref(),
+            None,
+            8,
+        );
     }
 
     // ── 3. Fuzzy search via in-memory cache ─────────────────────────────────
@@ -183,12 +124,11 @@ pub fn search_items(
     scored.sort_by(|a, b| b.0.cmp(&a.0));
     let base_results: Vec<(SearchItem, i64)> = scored.into_iter().map(|(s, i)| (i, s)).collect();
 
-    // ── 3. Apply ranking ────────────────────────────────────────────────────
-    let engine = &index_state.0;
+    // ── 3. Apply fast in-memory ranking ─────────────────────────────────────
     let scored_items: Vec<ScoredItem> = base_results
         .into_iter()
         .map(|(item, fuzzy)| {
-            let (count, last_ts) = engine.get_stats(&item.path);
+            let (count, last_ts) = history_manager.get_launch_stats(&item.path);
             let depth = std::path::Path::new(&item.path).components().count();
             let is_app = item.category == "APP";
             let time_score = history_manager.get_time_score(&item.path);
@@ -202,42 +142,15 @@ pub fn search_items(
         .map(SearchResult::from)
         .collect::<Vec<_>>();
 
-    // ── 4. Inject Recent items at the top ────────────────────────────────────
-    let history = history_manager.load();
-    let mut recents: Vec<SearchResult> = Vec::new();
-
-    for record in history.records {
-        if recents.len() >= 5 { break; }
-
-        let item = if record.path.starts_with("COMMAND:") {
-            // Synthetic command item
-            let name = if record.path.contains("> health") { "System Health" } 
-                      else if record.path.contains("> sys") { "System Action" }
-                      else { "Recent Action" };
-            Some(crate::indexer::SearchItem {
-                name: format!("⚡ {}", name),
-                path: record.path.clone(),
-                icon: None,
-                item_type: crate::indexer::ItemType::File,
-                category: "RECENT".to_string(),
-            })
-        } else {
-            items.iter().find(|i| i.path == record.path).map(|cached| {
-                let mut recent_item = cached.clone();
-                recent_item.category = "RECENT".to_string();
-                recent_item
-            })
-        };
-
-        if let Some(res_item) = item {
-            let match_ok = query_trimmed.is_empty()
-                || matcher.fuzzy_match(&res_item.name, query_trimmed).is_some();
-
-            if match_ok {
-                recents.push(SearchResult::from(res_item));
-            }
-        }
-    }
+    // ── 4. Inject matching Recent items at the top ──────────────────────────
+    let recents = build_recents(
+        &history_manager,
+        &items,
+        forced_category,
+        forced_item_type.as_ref(),
+        Some((&matcher, query_trimmed)),
+        5,
+    );
     drop(items); // release lock early
 
     // ── 5. Merge: Recents → Ranked, deduplicated ─────────────────────────────
@@ -499,4 +412,75 @@ fn acronym_match(name: &str, query: &str) -> Option<i64> {
     } else {
         None
     }
+}
+
+// ── Recents Helper ──────────────────────────────────────────────────────────
+
+fn build_recents(
+    history_manager: &HistoryManager,
+    items: &[SearchItem],
+    forced_category: Option<&str>,
+    forced_item_type: Option<&crate::indexer::ItemType>,
+    matcher: Option<(&SkimMatcherV2, &str)>,
+    limit: usize,
+) -> Vec<SearchResult> {
+    let history = history_manager.load();
+    let mut recents = Vec::new();
+
+    for record in history.records.iter() {
+        if recents.len() >= limit {
+            break;
+        }
+
+        let item = if record.path.starts_with("COMMAND:") {
+            if forced_category.is_some() || forced_item_type.is_some() {
+                continue;
+            }
+
+            let name = if record.path.contains("> health") {
+                "System Health"
+            } else if record.path.contains("> sys") {
+                "System Action"
+            } else {
+                "Recent Action"
+            };
+
+            Some(SearchItem {
+                name: format!("⚡ {}", name),
+                path: record.path.clone(),
+                icon: None,
+                item_type: crate::indexer::ItemType::File,
+                category: "RECENT".to_string(),
+            })
+        } else {
+            items.iter().find(|i| i.path == record.path).and_then(|cached| {
+                if let Some(cat) = forced_category {
+                    if cached.category != cat {
+                        return None;
+                    }
+                }
+                if let Some(itype) = forced_item_type {
+                    if cached.item_type != *itype {
+                        return None;
+                    }
+                }
+                let mut recent_item = cached.clone();
+                recent_item.category = "RECENT".to_string();
+                Some(recent_item)
+            })
+        };
+
+        if let Some(res_item) = item {
+            let match_ok = match matcher {
+                Some((m, q)) if !q.is_empty() => m.fuzzy_match(&res_item.name, q).is_some(),
+                _ => true,
+            };
+
+            if match_ok {
+                recents.push(SearchResult::from(res_item));
+            }
+        }
+    }
+
+    recents
 }

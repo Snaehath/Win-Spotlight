@@ -10,88 +10,7 @@ use notify_debouncer_mini::{new_debouncer, DebouncedEventKind, DebouncedEvent};
 use notify::RecursiveMode;
 
 use crate::index_engine::IndexEngine;
-use crate::indexer::{SearchItem, ItemType, get_file_category_and_icon, get_app_icon, IconCache};
-
-const IGNORED_NAMES: &[&str] = &[
-    "node_modules", ".git", "target", "dist", "__pycache__",
-    "AppData", "Common Files", "bin", "obj", "Windows", "Recovery",
-];
-
-fn is_ignored(path: &Path) -> bool {
-    path.components().any(|c| {
-        let s = c.as_os_str().to_str().unwrap_or("");
-        IGNORED_NAMES.iter().any(|&ign| s.eq_ignore_ascii_case(ign))
-            || s.starts_with('$')
-    })
-}
-
-fn classify_path(path: &Path, icon_cache: &IconCache) -> Option<SearchItem> {
-    if is_ignored(path) { return None; }
-
-    let name = path.file_name()?.to_str()?;
-    if name.starts_with('.') { return None; }
-
-    if path.is_dir() {
-        let parent_name = path.parent()
-            .and_then(|p| p.file_name())
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
-        let display = if !parent_name.is_empty() {
-            format!("{} > {}", parent_name, name)
-        } else {
-            name.to_string()
-        };
-        return Some(SearchItem {
-            name: display,
-            path: path.to_string_lossy().to_string(),
-            icon: Some(crate::indexer::ICON_FOLDER.to_string()),
-            item_type: ItemType::Folder,
-            category: "FOLDER".to_string(),
-        });
-    }
-
-    let path_str = path.to_string_lossy().to_string();
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-    match ext.as_str() {
-        "exe" | "lnk" => {
-            let stem = path.file_stem()?.to_str()?;
-            if stem.to_lowercase().contains("uninstall") { return None; }
-            
-            // Use IconCache
-            let icon = if let Some(cached) = icon_cache.get(&path_str) {
-                Some(cached)
-            } else {
-                let extracted = get_app_icon(path);
-                if let Some(ref icon_b64) = extracted {
-                    icon_cache.set(&path_str, icon_b64);
-                }
-                extracted
-            };
-
-            Some(SearchItem {
-                name: stem.to_string(),
-                path: path_str,
-                icon,
-                item_type: ItemType::App,
-                category: "APP".to_string(),
-            })
-        }
-        _ => {
-            let (cat_str, icon) = get_file_category_and_icon(path);
-            if cat_str != "FILE" || ext == "txt" || ext == "md" {
-                 Some(SearchItem {
-                    name: name.to_string(),
-                    path: path_str,
-                    icon,
-                    item_type: ItemType::File,
-                    category: cat_str,
-                })
-            } else {
-                None
-            }
-        }
-    }
-}
+use crate::indexer::{SearchItem, classify_path, is_ignored_path, IconCache};
 
 /// Spawn the file watcher on a background thread.
 pub fn start_watcher(
@@ -134,11 +53,15 @@ fn process_event(
     icon_cache: &IconCache,
 ) {
     let path = &evt.path;
+    if is_ignored_path(path) {
+        return;
+    }
+
     let path_str = path.to_string_lossy().to_string();
 
     if let DebouncedEventKind::Any = evt.kind {
         if path.exists() {
-            if let Some(item) = classify_path(path, icon_cache) {
+            if let Some(item) = classify_path(path, Some(icon_cache)) {
                 let _ = engine.upsert(&item);
                 let mut lock = cache.lock().unwrap();
                 // Case-insensitive removal from cache to prevent duplicates

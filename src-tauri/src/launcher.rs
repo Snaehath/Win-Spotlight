@@ -54,15 +54,9 @@ pub fn launch_app(
         }
     }
 
-    if is_url {
-        // Use native ShellExecuteW to open URLs securely.
-        crate::shell::open_path_or_url(&path).map_err(|e| e.to_string())?;
-    } else {
-        // Launch the item securely via the native default handler (ShellExecuteW)
-        // This is more robust than calling explorer.exe directly and handles 
-        // folders, files, and links with their default associations.
-        crate::shell::open_path_or_url(&path).map_err(|e| e.to_string())?;
-    }
+    // Launch the item or URL securely via native ShellExecuteW.
+    // Handles URLs in default browser, apps, files, and folders with default associations.
+    crate::shell::open_path_or_url(&path).map_err(|e| e.to_string())?;
 
     Ok(true) // Hide window
 }

@@ -7,15 +7,18 @@ export const CATEGORY_CONFIG = {
   "WEB":       { title: "Web & Discovery" },
   "APP":       { title: "Applications" },
   "DOC":       { title: "Documents" },
+  "CODE":      { title: "Code & Config" },
   "XLS":       { title: "Spreadsheets" },
   "PPT":       { title: "Presentations" },
   "IMG":       { title: "Images" },
   "VID":       { title: "Videos" },
-  "FILE":      { title: "Other Files" },
+  "AUDIO":     { title: "Audio & Music" },
+  "ARCHIVE":   { title: "Archives & Compressed" },
+  "FOLDER":    { title: "Folders" },
   "DOWNLOADS": { title: "Downloads" },
   "DOCUMENTS": { title: "Documents Folder" },
   "PICTURES":  { title: "Pictures Folder" },
-  "FOLDER":    { title: "Folders" },
+  "FILE":      { title: "Other Files" },
 };
 
 // Legacy support if needed, but we'll migrate to CATEGORY_CONFIG
@@ -25,9 +28,9 @@ export const CATEGORY_TITLES = Object.fromEntries(
 
 export const CATEGORY_PRIORITY = [
   "RECENT", "COMMAND", "WEB SHORTCUT", "WEB",
-  "APP", "DOC", "XLS", "PPT", "IMG", "VID",
-  "DOWNLOADS", "DOCUMENTS", "PICTURES",
-  "FOLDER", "FILE",
+  "APP", "DOC", "CODE", "XLS", "PPT", "IMG", "VID", "AUDIO", "ARCHIVE",
+  "FOLDER", "DOWNLOADS", "DOCUMENTS", "PICTURES",
+  "FILE",
 ];
 
 // Helper: Escape HTML to prevent XSS from raw filenames

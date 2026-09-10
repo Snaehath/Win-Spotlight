@@ -50,6 +50,46 @@ pub fn get_base_scan_paths() -> Vec<PathBuf> {
     base_paths
 }
 
+pub fn is_ignored_dir_name(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    matches!(
+        lower.as_str(),
+        "node_modules"
+            | ".git"
+            | ".svn"
+            | ".hg"
+            | "target"
+            | "dist"
+            | "build"
+            | "out"
+            | "__pycache__"
+            | ".pytest_cache"
+            | "appdata"
+            | "common files"
+            | "bin"
+            | "obj"
+            | ".vs"
+            | ".idea"
+            | ".vscode"
+            | "vendor"
+            | ".next"
+            | ".nuxt"
+            | ".cache"
+            | "windows"
+            | "recovery"
+            | "system volume information"
+            | "perflogs"
+            | "config.msi"
+    )
+}
+
+pub fn is_ignored_path(path: &std::path::Path) -> bool {
+    path.components().any(|c| {
+        let s = c.as_os_str().to_str().unwrap_or("");
+        is_ignored_dir_name(s) || s.starts_with('$')
+    })
+}
+
 pub fn should_skip_directory(name: &str, depth: usize) -> bool {
     let lower_name = name.to_lowercase();
     
@@ -68,6 +108,5 @@ pub fn should_skip_directory(name: &str, depth: usize) -> bool {
         return true;
     }
     
-    // General speed exclusions
-    matches!(name, "node_modules" | ".git" | "target" | "dist" | "__pycache__" | "AppData" | "Common Files" | "bin" | "obj")
+    is_ignored_dir_name(name)
 }
