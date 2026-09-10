@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use tantivy::{
     schema::*,
     Index, IndexWriter, IndexReader,
-    query::QueryParser,
+    query::{QueryParser, RegexQuery, BooleanQuery, Occur, Query},
     collector::TopDocs,
     ReloadPolicy,
     doc,
@@ -193,30 +193,39 @@ impl IndexEngine {
             return Vec::new();
         }
 
-        let mut qp = QueryParser::for_index(&self.index, vec![s.f_name]);
-        qp.set_conjunction_by_default();
-
-        // Build wildcard term query (e.g. "code*" or "spot* win*")
         let tokens: Vec<&str> = clean_str.split_whitespace().collect();
-        let wildcard_expr = tokens
-            .iter()
-            .map(|t| format!("{}*", t))
-            .collect::<Vec<_>>()
-            .join(" ");
+        if tokens.is_empty() {
+            return Vec::new();
+        }
 
-        let parsed_query = qp.parse_query(&wildcard_expr)
-            .or_else(|_| qp.parse_query(clean_str));
-
-        if let Ok(query) = parsed_query {
-            if let Ok(top) = searcher.search(&query, &TopDocs::with_limit(limit)) {
-                return top.into_iter().filter_map(|(score, addr)| {
-                    searcher.doc::<TantivyDocument>(addr).ok().and_then(|d| {
-                        d.get_first(s.f_path)
-                            .and_then(|v| v.as_str())
-                            .map(|p| (p.to_string(), (score * 1000.0) as i64))
-                    })
-                }).collect();
+        // Build prefix RegexQuery for each token (e.g. "aqua.*")
+        let mut subqueries: Vec<(Occur, Box<dyn Query>)> = Vec::new();
+        for t in &tokens {
+            let pattern = format!("{}.*", t.to_lowercase());
+            if let Ok(rq) = RegexQuery::from_pattern(&pattern, s.f_name) {
+                subqueries.push((Occur::Must, Box::new(rq)));
             }
+        }
+
+        let query: Box<dyn Query> = if !subqueries.is_empty() {
+            Box::new(BooleanQuery::new(subqueries))
+        } else {
+            let mut qp = QueryParser::for_index(&self.index, vec![s.f_name]);
+            qp.set_conjunction_by_default();
+            match qp.parse_query(clean_str) {
+                Ok(q) => q,
+                Err(_) => return Vec::new(),
+            }
+        };
+
+        if let Ok(top) = searcher.search(&query, &TopDocs::with_limit(limit)) {
+            return top.into_iter().filter_map(|(score, addr)| {
+                searcher.doc::<TantivyDocument>(addr).ok().and_then(|d| {
+                    d.get_first(s.f_path)
+                        .and_then(|v| v.as_str())
+                        .map(|p| (p.to_string(), (score * 1000.0) as i64))
+                })
+            }).collect();
         }
 
         Vec::new()

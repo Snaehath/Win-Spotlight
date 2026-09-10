@@ -579,9 +579,14 @@ mod tests {
             SearchItem::new("Quarterly Report".to_string(), "C:\\Docs\\report.pdf".to_string(), None, crate::indexer::ItemType::File, "DOC".to_string()),
             SearchItem::new("Vacation Photos".to_string(), "C:\\Pictures\\Vacation".to_string(), None, crate::indexer::ItemType::Folder, "FOLDER".to_string()),
             SearchItem::new("Intro Video".to_string(), "C:\\Videos\\intro.mp4".to_string(), None, crate::indexer::ItemType::File, "VID".to_string()),
+            SearchItem::new("aquaFlow".to_string(), "D:\\DevelopmentSide\\React Native\\aquaFlow".to_string(), None, crate::indexer::ItemType::Folder, "FOLDER".to_string()),
         ];
         engine.bulk_add(&items).unwrap();
-        assert_eq!(engine.reader.searcher().num_docs(), 3);
+        assert_eq!(engine.reader.searcher().num_docs(), 4);
+
+        let aqua_cand = engine.search_candidates("aqua", 5);
+        assert_eq!(aqua_cand.len(), 1, "aqua should match aquaFlow via prefix!");
+        assert_eq!(aqua_cand[0].0, "D:\\DevelopmentSide\\React Native\\aquaFlow");
 
         let report_cand = engine.search_candidates("report", 5);
         assert_eq!(report_cand.len(), 1);
