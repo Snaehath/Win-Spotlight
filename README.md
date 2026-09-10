@@ -89,6 +89,7 @@ Spotlight-Win combines a responsive web frontend with a high-performance native 
 - **Self-Healing State Recovery**: Transparent automatic reconstruction of derived index files on unexpected process termination or corruption—zero error popups or manual user fixes required.
 - **In-Memory Caching & $O(1)$ Mapping**: Extracted Windows binary icons, precomputed normalized names, acronyms, and path lookup maps avoid disk I/O and per-keystroke allocations.
 - **Debounced Incremental Watcher**: Real-time filesystem changes (Desktop, Start Menu, User Folders) batch-update without UI stutter or SSD thrashing.
+- **Single Activation Invariant**: A single launcher session can activate a selected result at most once. Repeated <kbd>Enter</kbd> keydowns, OS key-repeat, and concurrent activation attempts are consumed idempotently until a new session is initiated.
 - **Failsafe System Actions**: Destructive actions (shutdown, restart) require deliberate keywords and trigger confirmation prompts before execution.
 
 ---
@@ -120,17 +121,20 @@ Standalone setup files and binaries will be generated in `src-tauri/target/relea
 
 ---
 
-## 🎯 v1.0 Production Hardening Roadmap
+## 🎯 v1.0 Release Candidate Hardening Roadmap
 
-Rather than adding endless features, our current milestone is focused entirely on **production hardening, reliability, and friction removal**:
+Spotlight-Win is operating under an active **feature freeze** to focus exclusively on production reliability, Windows integration, and friction removal.
+
+Detailed release exit criteria and soak testing protocols are tracked in [`RC_ACCEPTANCE_MATRIX.md`](file:///d:/DevelopmentSide/AI-Studio/spotlight-win/RC_ACCEPTANCE_MATRIX.md).
 
 - [x] **Bounded Two-Stage Search**: Tantivy candidate retrieval with bounded personal ranking and zero-allocation metadata.
-- [x] **Self-Healing Index Recovery**: Automatic recovery from unexpected termination and corrupt cache states.
-- [x] **Automated Regression Suite**: 8 product invariant tests covering scoring separation, exponential recency, acronyms, and safeguards.
+- [x] **Self-Healing Index Recovery**: Automatic transparent recovery from unexpected process kills and corrupt cache states.
+- [x] **User State Preservation**: Defensive timestamped backups of `history_v2.json` on corruption before state reset.
+- [x] **Single Activation Invariant**: Dual-boundary session lock preventing duplicate launches from held or repeated <kbd>Enter</kbd> presses.
+- [x] **Automated Invariant Suite**: 9 automated regression tests covering scoring separation, exponential recency, acronyms, and safeguards.
 - [ ] **End-to-End Latency Verification**: Real-world dogfooding measuring p50 (<50ms) / p95 (<100ms) / p99 keypress-to-paint times.
 - [ ] **Edge-Case Resilience**: Seamless behavior across multi-monitor setups, high-DPI scaling (125%, 150%, 200%), and Windows sleep/wake cycles.
 - [ ] **Zero-Friction Installer**: Smooth one-click install/uninstall experience for everyday users.
-- [ ] **Clipboard History**: Clean, unobtrusive search-and-paste clipboard workflow.
 
 ---
 

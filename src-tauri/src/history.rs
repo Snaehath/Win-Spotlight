@@ -36,7 +36,20 @@ impl HistoryManager {
 
     fn load_from_disk(&self) -> History {
         if let Ok(content) = fs::read_to_string(&self.path) {
-            serde_json::from_str::<History>(&content).unwrap_or_else(|_| History { records: Vec::new() })
+            match serde_json::from_str::<History>(&content) {
+                Ok(h) => h,
+                Err(e) => {
+                    eprintln!("[History] Corrupt history detected: {}. Backing up before reset.", e);
+                    let timestamp = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+                    let backup_name = format!("history_v2.corrupt.{}.json", timestamp);
+                    let backup_path = self.path.with_file_name(backup_name);
+                    let _ = fs::rename(&self.path, backup_path);
+                    History { records: Vec::new() }
+                }
+            }
         } else {
             History { records: Vec::new() }
         }
@@ -152,5 +165,45 @@ impl HistoryManager {
             !(r.path.starts_with("COMMAND:http") || r.path.starts_with("COMMAND:www."))
         });
         self.save(&history);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_corrupt_history_backed_up_and_recovers() {
+        let temp_dir = std::env::temp_dir().join(format!("spotlight_test_history_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let _ = fs::create_dir_all(&temp_dir);
+        let history_file = temp_dir.join("history_v2.json");
+
+        // Write corrupt/invalid JSON content
+        fs::write(&history_file, b"NOT_VALID_JSON_CORRUPTED_DATA{{{").unwrap();
+
+        let mgr = HistoryManager {
+            path: history_file.clone(),
+            cache: std::sync::Mutex::new(None),
+        };
+
+        let loaded = mgr.load_from_disk();
+        // Should recover gracefully with empty records
+        assert_eq!(loaded.records.len(), 0);
+
+        // Should have backed up the corrupt file
+        let entries: Vec<_> = fs::read_dir(&temp_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+
+        assert!(
+            entries.iter().any(|name| name.starts_with("history_v2.corrupt.")),
+            "Corrupted history file was not preserved with a backup: {:?}",
+            entries
+        );
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }

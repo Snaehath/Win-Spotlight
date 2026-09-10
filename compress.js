@@ -3,19 +3,36 @@ import { execSync } from 'child_process';
 
 const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
 const version = pkg.version;
-const exePath = `src-tauri/target/release/bundle/nsis/spotlight-win_${version}_x64-setup.exe`;
-const zipPath = `spotlight-win_${version}_x64-setup.zip`;
 
-if (fs.existsSync(exePath)) {
-  console.log(`[Spotlight-Win] Compressing ${exePath} into ${zipPath}...`);
-  try {
-    execSync(`powershell -Command "Compress-Archive -Path '${exePath}' -DestinationPath '${zipPath}' -Force"`, { stdio: 'inherit' });
-    console.log(`[Spotlight-Win] Successfully created ${zipPath}!`);
-  } catch (err) {
-    console.error(`[Spotlight-Win] Failed to compress:`, err.message);
-    process.exit(1);
+const targets = [
+  {
+    path: `src-tauri/target/release/bundle/msi/spotlight-win_${version}_x64_en-US.msi`,
+    zip: `spotlight-win_${version}_x64_en-US.msi.zip`,
+    label: 'MSI Installer'
+  },
+  {
+    path: `src-tauri/target/release/bundle/nsis/spotlight-win_${version}_x64-setup.exe`,
+    zip: `spotlight-win_${version}_x64-setup.zip`,
+    label: 'NSIS Setup'
   }
-} else {
-  console.error(`[Spotlight-Win] Error: Could not find the build executable at ${exePath}. Did the build fail?`);
-  process.exit(1);
+];
+
+let foundAny = false;
+
+for (const target of targets) {
+  if (fs.existsSync(target.path)) {
+    foundAny = true;
+    console.log(`[Spotlight-Win] Found ${target.label} at ${target.path}`);
+    console.log(`[Spotlight-Win] Compressing into ${target.zip}...`);
+    try {
+      execSync(`powershell -Command "Compress-Archive -Path '${target.path}' -DestinationPath '${target.zip}' -Force"`, { stdio: 'inherit' });
+      console.log(`[Spotlight-Win] Successfully created ${target.zip}!`);
+    } catch (err) {
+      console.error(`[Spotlight-Win] Failed to compress ${target.zip}:`, err.message);
+    }
+  }
+}
+
+if (!foundAny) {
+  console.warn(`[Spotlight-Win] Notice: No installer bundles found under src-tauri/target/release/bundle/.`);
 }

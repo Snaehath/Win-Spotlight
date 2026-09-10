@@ -14,6 +14,7 @@ let filterTag;
 let activeFilter = null;
 let collapsedCategories = new Set();
 let helpOverlay;
+let isActivating = false;
 
 const KEYWORD_MAP = {
   "app:": "Applications",
@@ -88,6 +89,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // ── Keyboard navigation ──────────────────────────────────────────────────
   window.addEventListener("keydown", async (e) => {
+    // Single Activation Invariant: Ignore OS key-repeat for activation/dismiss keys
+    if (e.repeat && (e.key === "Enter" || e.key === "Escape")) {
+      e.preventDefault();
+      return;
+    }
+
     if (e.key === "Enter" && e.altKey) {
       e.preventDefault();
       let targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
@@ -138,6 +145,12 @@ window.addEventListener("DOMContentLoaded", () => {
       filterTag.classList.add("hidden");
       e.preventDefault();
     } else if (e.key === "Enter") {
+      // Single Activation Invariant: Prevent multiple launches within one session
+      if (isActivating) {
+        e.preventDefault();
+        return;
+      }
+
       let targetIndex = selectedIndex;
       if (targetIndex === -1 && currentResults.length > 0) targetIndex = 0;
 
@@ -182,6 +195,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // ── Auto-clear and focus on window show ──────────────────────────────────
   if (window.__TAURI__ && window.__TAURI__.event) {
     window.__TAURI__.event.listen("window-shown", () => {
+      isActivating = false; // Reset session lock for fresh launcher session
       searchInput.value = "";
       activeFilter = null;
       if (filterTag) filterTag.classList.add("hidden");
@@ -224,22 +238,32 @@ function toggleCategory(category) {
 // ── Launch Logic ─────────────────────────────────────────────────────────────
 
 async function launchSelected(path, e) {
-  if (!path) return;
+  if (!path || isActivating) return;
+  isActivating = true;
+
+  const releaseLock = () => {
+    isActivating = false;
+  };
 
   // ── Alt + Click: Remove from history ──
   if (e && e.altKey) {
-    await invoke("remove_from_history", { path });
-    // Refresh results immediately
-    const currentVal = searchInput.value;
-    const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
-    const res = await invoke("search_items", { query: fullQuery });
-    currentResults = sortByPriority(res);
-    render();
+    try {
+      await invoke("remove_from_history", { path });
+      // Refresh results immediately
+      const currentVal = searchInput.value;
+      const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
+      const res = await invoke("search_items", { query: fullQuery });
+      currentResults = sortByPriority(res);
+      render();
+    } finally {
+      releaseLock();
+    }
     return;
   }
 
   // ── Shift + Click: Reveal in Explorer ──
   if (e && e.shiftKey && !path.startsWith("COMMAND:")) {
+    releaseLock();
     revealSelected(path);
     return;
   }
@@ -252,6 +276,7 @@ async function launchSelected(path, e) {
   if (item && item.category === "FILTER") {
     searchInput.value = path;
     searchInput.dispatchEvent(new Event("input"));
+    releaseLock();
     return;
   }
 
@@ -263,21 +288,26 @@ async function launchSelected(path, e) {
     searchInput.placeholder = "Enter alias name (e.g. 'yt')...";
     currentResults = [];
     render();
+    releaseLock();
     return;
   }
 
   if (path === "CLEAR_SHORTCUTS") {
-    const confirmed = await showConfirm(
-      "Clear All Shortcuts?",
-      "This will permanently delete all your saved web aliases. Are you sure?",
-      searchInput,
-    );
-    if (confirmed) {
-      await invoke("clear_shortcuts");
-      // Refresh recents
-      const res = await invoke("search_items", { query: "" });
-      currentResults = sortByPriority(res);
-      render();
+    try {
+      const confirmed = await showConfirm(
+        "Clear All Shortcuts?",
+        "This will permanently delete all your saved web aliases. Are you sure?",
+        searchInput,
+      );
+      if (confirmed) {
+        await invoke("clear_shortcuts");
+        // Refresh recents
+        const res = await invoke("search_items", { query: "" });
+        currentResults = sortByPriority(res);
+        render();
+      }
+    } finally {
+      releaseLock();
     }
     return;
   }
@@ -293,7 +323,10 @@ async function launchSelected(path, e) {
       "This will open your default web browser to perform a search or follow a link.",
       searchInput,
     );
-    if (!confirmed) return;
+    if (!confirmed) {
+      releaseLock();
+      return;
+    }
   }
 
   // ── System Actions Confirmation ──
@@ -318,18 +351,29 @@ async function launchSelected(path, e) {
         : `Are you sure you want to ${action} the computer now?`,
       searchInput,
     );
-    if (!confirmed) return;
+    if (!confirmed) {
+      releaseLock();
+      return;
+    }
   }
 
+  // ── Actual Launch Execution ──
   try {
     const shouldHide = await invoke("launch_app", { path });
     if (shouldHide) {
       await invoke("hide_window");
       searchInput.value = "";
       selectedIndex = -1;
+      // Single Activation Invariant:
+      // The session lock (isActivating) deliberately remains TRUE.
+      // Subsequent Enter keydowns, OS key-repeats, or clicks are completely ignored
+      // until window-shown resets isActivating for a fresh launcher session.
+    } else {
+      releaseLock();
     }
   } catch (err) {
     console.error("Launch error:", err);
+    releaseLock();
   }
 }
 
