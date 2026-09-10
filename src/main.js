@@ -40,6 +40,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // ── Debounced Search ──────────────────────────────────────────────────────
   let searchTimeout;
+  let currentQueryId = 0;
 
   searchInput.addEventListener("input", () => {
     if (currentMode === "NAMING") return; // Don't search while naming
@@ -62,7 +63,7 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     if (searchTimeout) clearTimeout(searchTimeout);
-    const delay = query.startsWith(">") ? 250 : 150;
+    const delay = query.startsWith(">") ? 150 : 45;
 
     searchTimeout = setTimeout(async () => {
       const currentVal = searchInput.value;
@@ -74,9 +75,12 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      const queryId = ++currentQueryId;
       const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
       const res = await invoke("search_items", { query: fullQuery });
-      currentResults = sortByPriority(res);
+      if (queryId !== currentQueryId) return; // Drop stale out-of-order response
+
+      currentResults = sortByPriority(res).slice(0, 10);
       selectedIndex = -1;
       render();
     }, delay);
@@ -92,9 +96,16 @@ window.addEventListener("DOMContentLoaded", () => {
         await invoke("remove_from_history", { path: item.path });
 
         const res = await invoke("search_items", { query: searchInput.value });
-        currentResults = sortByPriority(res);
+        currentResults = sortByPriority(res).slice(0, 10);
         selectedIndex = Math.max(selectedIndex - 1, 0);
         render();
+      }
+    } else if ((e.key === "C" || e.key === "c") && e.ctrlKey && e.shiftKey) {
+      e.preventDefault();
+      let targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
+      const item = currentResults[targetIndex];
+      if (item && item.path) {
+        navigator.clipboard.writeText(item.path);
       }
     } else if (e.key === "ArrowDown") {
       let nextIndex = selectedIndex + 1;
@@ -150,7 +161,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // ── Initial results ────────
   invoke("search_items", { query: "" }).then((res) => {
-    currentResults = sortByPriority(res);
+    currentResults = sortByPriority(res).slice(0, 10);
     render();
   });
 
@@ -176,7 +187,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (filterTag) filterTag.classList.add("hidden");
       searchInput.focus();
       invoke("search_items", { query: "" }).then((res) => {
-        currentResults = sortByPriority(res);
+        currentResults = sortByPriority(res).slice(0, 10);
         selectedIndex = -1;
         render();
       });

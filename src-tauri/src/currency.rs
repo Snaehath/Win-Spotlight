@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::indexer::{SearchItem, ItemType};
+use crate::indexer::SearchItem;
 use crate::search::SearchResult;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -200,16 +200,8 @@ pub fn detect_currency_intent(query: &str) -> Vec<SearchResult> {
             let formatted_amount = format!("{:.2}", converted);
             
             let display = format!("{} {} = {} {}", a, f, formatted_amount, target);
-            
             let web_search_query = format!("COMMAND:> g {} {} to {}", a, f, target);
-            
-            let synthetic = SearchItem {
-                name: display.clone(),
-                path: web_search_query,
-                icon: None,
-                item_type: ItemType::File,
-                category: "COMMAND".to_string(),
-            };
+            let synthetic = SearchItem::synthetic(display.clone(), web_search_query, "COMMAND");
             results.push(SearchResult {
                 item: synthetic,
                 inline_display: Some(display),

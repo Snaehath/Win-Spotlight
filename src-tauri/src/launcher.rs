@@ -10,7 +10,7 @@ pub fn launch_app(
     path: String,
     _app_handle: AppHandle,
     history_manager: State<'_, HistoryManager>,
-    index_state: State<'_, crate::search::IndexState>,
+    _index_state: State<'_, crate::search::IndexState>,
     cache: State<'_, AppCache>,
     cmd_state: State<'_, CommandState>,
 ) -> Result<bool, String> {
@@ -30,11 +30,6 @@ pub fn launch_app(
 
     // Persist to adaptive JSON history (for Recents UI + Time Ranking)
     history_manager.record_launch(path.clone());
-
-    // Update Tantivy launch stats (count + timestamp)
-    let items = cache.apps.lock().unwrap();
-    index_state.0.record_launch(&path, &items);
-    drop(items);
 
     // Ensure the path was properly identified in the AppCache or is a valid URL
     let is_url = path.starts_with("http://") || path.starts_with("https://");

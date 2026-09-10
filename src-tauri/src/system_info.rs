@@ -82,13 +82,13 @@ pub fn get_ram_usage() -> Option<SearchResult> {
         mem_info.dw_memory_load, used_gb, total_gb
     );
 
-    let synthetic = SearchItem {
-        name: display.clone(),
-        path: String::new(),
-        icon: Some("cpu".to_string()),
-        item_type: ItemType::File,
-        category: "COMMAND".to_string(),
-    };
+    let synthetic = SearchItem::new(
+        display.clone(),
+        String::new(),
+        Some("cpu".to_string()),
+        ItemType::File,
+        "COMMAND".to_string(),
+    );
 
     Some(SearchResult {
         item: synthetic,
@@ -145,13 +145,13 @@ pub fn get_cpu_usage() -> Option<SearchResult> {
 
     let display = format!("CPU Load: {}%", cpu_percent);
 
-    let synthetic = SearchItem {
-        name: display.clone(),
-        path: String::new(),
-        icon: Some("activity".to_string()),
-        item_type: ItemType::File,
-        category: "COMMAND".to_string(),
-    };
+    let synthetic = SearchItem::new(
+        display.clone(),
+        String::new(),
+        Some("activity".to_string()),
+        ItemType::File,
+        "COMMAND".to_string(),
+    );
 
     Some(SearchResult {
         item: synthetic,
@@ -195,13 +195,13 @@ pub fn get_disk_spaces() -> Vec<SearchResult> {
                     drive.trim_end_matches('\\'), percent_used, free_gb, total_gb
                 );
 
-                let synthetic = SearchItem {
-                    name: display.clone(),
-                    path: String::new(),
-                    icon: Some("hard-drive".to_string()),
-                    item_type: ItemType::File,
-                    category: "COMMAND".to_string(),
-                };
+                let synthetic = SearchItem::new(
+                    display.clone(),
+                    String::new(),
+                    Some("hard-drive".to_string()),
+                    ItemType::File,
+                    "COMMAND".to_string(),
+                );
 
                 results.push(SearchResult {
                     item: synthetic,

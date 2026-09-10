@@ -28,6 +28,43 @@ pub struct SearchItem {
     pub icon: Option<String>,
     pub item_type: ItemType,
     pub category: String,
+    #[serde(skip)]
+    pub normalized_name: String,
+    #[serde(skip)]
+    pub acronym: String,
+}
+
+impl SearchItem {
+    pub fn new(
+        name: String,
+        path: String,
+        icon: Option<String>,
+        item_type: ItemType,
+        category: String,
+    ) -> Self {
+        let normalized_name = name.to_lowercase();
+        let acronym: String = name
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| !w.is_empty())
+            .filter_map(|w| w.chars().next())
+            .collect::<String>()
+            .to_lowercase();
+
+        SearchItem {
+            name,
+            path,
+            icon,
+            item_type,
+            category,
+            normalized_name,
+            acronym,
+        }
+    }
+
+    pub fn synthetic(name: impl Into<String>, path: impl Into<String>, category: impl Into<String>) -> Self {
+        let n = name.into();
+        Self::new(n, path.into(), None, ItemType::File, category.into())
+    }
 }
 
 /// Unified classifier for files, apps, and folders across both scanner and watcher
@@ -38,24 +75,13 @@ pub fn classify_path(path: &Path, cache: Option<&IconCache>) -> Option<SearchIte
     }
 
     if path.is_dir() {
-        let parent_name = path
-            .parent()
-            .and_then(|p| p.file_name())
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
-        let display_name = if !parent_name.is_empty() {
-            format!("{} > {}", parent_name, name)
-        } else {
-            name.to_string()
-        };
-
-        return Some(SearchItem {
-            name: display_name,
-            path: path.to_string_lossy().to_string(),
-            icon: Some(ICON_FOLDER.to_string()),
-            item_type: ItemType::Folder,
-            category: "FOLDER".to_string(),
-        });
+        return Some(SearchItem::new(
+            name.to_string(),
+            path.to_string_lossy().to_string(),
+            Some(ICON_FOLDER.to_string()),
+            ItemType::Folder,
+            "FOLDER".to_string(),
+        ));
     }
 
     let path_str = path.to_string_lossy().to_string();
@@ -85,22 +111,22 @@ pub fn classify_path(path: &Path, cache: Option<&IconCache>) -> Option<SearchIte
             get_app_icon(path)
         };
 
-        Some(SearchItem {
-            name: stem.to_string(),
-            path: path_str,
+        Some(SearchItem::new(
+            stem.to_string(),
+            path_str,
             icon,
-            item_type: ItemType::App,
-            category: "APP".to_string(),
-        })
+            ItemType::App,
+            "APP".to_string(),
+        ))
     } else {
         let (cat_str, icon) = get_file_category_and_icon(path);
-        Some(SearchItem {
-            name: name.to_string(),
-            path: path_str,
+        Some(SearchItem::new(
+            name.to_string(),
+            path_str,
             icon,
-            item_type: ItemType::File,
-            category: cat_str,
-        })
+            ItemType::File,
+            cat_str,
+        ))
     }
 }
 
@@ -201,13 +227,13 @@ pub fn scan_items(cache: Option<&IconCache>) -> Vec<SearchItem> {
                 get_app_icon(&tool_path)
             };
 
-            items.push(SearchItem {
-                name: tool_name.to_string(),
-                path: path_str,
+            items.push(SearchItem::new(
+                tool_name.to_string(),
+                path_str,
                 icon,
-                item_type: ItemType::App,
-                category: "APP".to_string(),
-            });
+                ItemType::App,
+                "APP".to_string(),
+            ));
         }
     }
 

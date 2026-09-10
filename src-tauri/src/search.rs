@@ -1,6 +1,6 @@
 use crate::history::HistoryManager;
 use crate::indexer::SearchItem;
-use crate::ranking::{compute_score, ScoredItem, rank};
+use crate::ranking::{compute_score, ScoredIndex};
 use crate::commands::{CommandRegistry, CommandResult, eval_expression};
 use crate::index_engine::IndexEngine;
 
@@ -8,10 +8,12 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use tauri::State;
 use std::sync::{Arc, Mutex};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 pub struct AppCache {
     pub apps: Arc<Mutex<Vec<SearchItem>>>,
+    pub path_lookup: Arc<Mutex<HashMap<String, usize>>>,
+    pub app_indices: Arc<Mutex<Vec<usize>>>,
 }
 
 pub struct IndexState(pub Arc<IndexEngine>);
@@ -40,7 +42,7 @@ pub fn search_items(
     state: State<'_, AppCache>,
     history_manager: State<'_, HistoryManager>,
     shortcut_manager: State<'_, crate::shortcuts::ShortcutManager>,
-    _index_state: State<'_, IndexState>,
+    index_state: State<'_, IndexState>,
     cmd_state: State<'_, CommandState>,
 ) -> Vec<SearchResult> {
     let query_trimmed = query.trim();
@@ -70,15 +72,14 @@ pub fn search_items(
     }
 
     let items = state.apps.lock().unwrap();
-    let matcher = SkimMatcherV2::default();
+    let path_lookup = state.path_lookup.lock().unwrap();
 
     // ── 2. Empty query: show recents ───────────────────────────────────────
-    // Note: We skip this early return if the `command:` filter is active, 
-    // so we can show the full command list even with an empty query.
     if actual_query.is_empty() && forced_category != Some("COMMAND") {
         return build_recents(
             &history_manager,
             &items,
+            &path_lookup,
             forced_category,
             forced_item_type.as_ref(),
             None,
@@ -86,76 +87,126 @@ pub fn search_items(
         );
     }
 
-    // ── 3. Fuzzy search via in-memory cache ─────────────────────────────────
-    let mut scored: Vec<(i64, SearchItem)> = items
-        .iter()
-        .filter(|item| {
+    let matcher = SkimMatcherV2::default();
+    let query_lower = actual_query.to_lowercase();
+    let now = crate::ranking::current_timestamp_secs();
+
+    // ── 3. Stage 1: Candidate Retrieval (Tantivy Inverted Index + In-Memory Guarantee) ─
+    let mut candidates: Vec<(i64, usize)> = Vec::with_capacity(64);
+    let mut candidate_seen: HashSet<usize> = HashSet::with_capacity(64);
+
+    // 3.1 Retrieve candidates from Tantivy inverted index
+    let tantivy_candidates = index_state.0.search_candidates(actual_query, 64);
+    for (cand_path, tantivy_score) in tantivy_candidates {
+        if let Some(&idx) = path_lookup.get(&cand_path) {
+            let item = &items[idx];
             if let Some(cat) = forced_category {
-                if item.category != cat { return false; }
+                if item.category != cat { continue; }
             }
             if let Some(ref itype) = forced_item_type {
-                if item.item_type != *itype { return false; }
+                if item.item_type != *itype { continue; }
             }
-            true
-        })
-        .filter_map(|item| {
-            let score_name = matcher.fuzzy_match(&item.name, actual_query);
-            let score_path = if actual_query.len() > 3 {
-                matcher.fuzzy_match(&item.path, actual_query).map(|s| s - 50) // Penalty for path match
+
+            let is_exact = item.normalized_name == query_lower;
+            let is_prefix = item.normalized_name.starts_with(&query_lower);
+            let mut score = if is_exact {
+                1200
+            } else if is_prefix {
+                700
             } else {
-                None
+                tantivy_score
             };
-
-            let fuzzy = match (score_name, score_path) {
-                (Some(s1), Some(s2)) => Some(s1.max(s2)),
-                (Some(s), None) | (None, Some(s)) => Some(s),
-                (None, None) => None,
-            };
-
-            let acronym = acronym_match(&item.name, actual_query);
-            match (fuzzy, acronym) {
-                (Some(f), Some(a)) => Some((f.max(a), item.clone())),
-                (Some(f), None)    => Some((f, item.clone())),
-                (None, Some(a))    => Some((a, item.clone())),
-                (None, None)       => None,
+            if item.category == "APP" {
+                score += 150;
             }
-        })
-        .collect();
-    scored.sort_by(|a, b| b.0.cmp(&a.0));
-    let base_results: Vec<(SearchItem, i64)> = scored.into_iter().map(|(s, i)| (i, s)).collect();
+            if candidate_seen.insert(idx) {
+                candidates.push((score, idx));
+            }
+        }
+    }
 
-    // ── 3. Apply fast in-memory ranking ─────────────────────────────────────
-    let scored_items: Vec<ScoredItem> = base_results
+    // 3.2 In-Memory Application Scan: Bounded strictly to installed applications (~100-300 items)
+    // Guarantees all installed apps are instantly found even if uncommitted in Tantivy
+    let app_indices = state.app_indices.lock().unwrap();
+    for &idx in app_indices.iter() {
+        if candidate_seen.contains(&idx) {
+            continue;
+        }
+        let item = &items[idx];
+        if let Some(cat) = forced_category {
+            if item.category != cat { continue; }
+        }
+        if let Some(ref itype) = forced_item_type {
+            if item.item_type != *itype { continue; }
+        }
+
+        let is_exact = item.normalized_name == query_lower;
+        let is_prefix = item.normalized_name.starts_with(&query_lower);
+        let is_acronym = !item.acronym.is_empty() && item.acronym.starts_with(&query_lower);
+
+        let base_score = if is_exact {
+            Some(1200)
+        } else if is_prefix {
+            Some(700)
+        } else if is_acronym {
+            Some(500)
+        } else {
+            matcher.fuzzy_match(&item.name, actual_query)
+        };
+
+        if let Some(mut s) = base_score {
+            s += 150; // APP category priority
+            candidate_seen.insert(idx);
+            candidates.push((s, idx));
+        }
+    }
+
+    // ── 4. Stage 2: Bounded Top-K Selection ─────────────────────────────────
+    const MAX_CANDIDATES: usize = 48;
+    if candidates.len() > MAX_CANDIDATES {
+        candidates.select_nth_unstable_by(MAX_CANDIDATES, |a, b| b.0.cmp(&a.0));
+        candidates.truncate(MAX_CANDIDATES);
+    }
+
+    // ── 5. Stage 3: Personal Composite Ranking ──────────────────────────────
+    let mut scored_indices: Vec<ScoredIndex> = candidates
         .into_iter()
-        .map(|(item, fuzzy)| {
+        .map(|(match_score, idx)| {
+            let item = &items[idx];
             let (count, last_ts) = history_manager.get_launch_stats(&item.path);
-            let depth = std::path::Path::new(&item.path).components().count();
             let is_app = item.category == "APP";
             let time_score = history_manager.get_time_score(&item.path);
-            let score = compute_score(fuzzy, count, last_ts, time_score, depth, is_app);
-            ScoredItem::new(item, score)
+            let score = compute_score(match_score, count, last_ts, time_score, is_app, now);
+            ScoredIndex::new(idx, score)
         })
         .collect();
 
-    let ranked = rank(scored_items)
-        .into_iter()
-        .map(SearchResult::from)
-        .collect::<Vec<_>>();
+    scored_indices.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
 
-    // ── 4. Inject matching Recent items at the top ──────────────────────────
+    // Materialize only the top 10 items
+    const TOP_K: usize = 10;
+    let ranked: Vec<SearchResult> = scored_indices
+        .into_iter()
+        .take(TOP_K)
+        .map(|s| SearchResult::from(items[s.index].clone()))
+        .collect();
+
+    // ── 6. Inject matching Recent items at the top ──────────────────────────
     let recents = build_recents(
         &history_manager,
         &items,
+        &path_lookup,
         forced_category,
         forced_item_type.as_ref(),
         Some((&matcher, query_trimmed)),
-        5,
+        4,
     );
-    drop(items); // release lock early
+    drop(path_lookup);
+    drop(items); // release locks early
 
-    // ── 5. Merge: Recents → Ranked, deduplicated ─────────────────────────────
-    let mut final_results: Vec<SearchResult> = Vec::new();
-    let mut seen_paths: HashSet<String> = HashSet::new();
+    // ── 7. Merge: Recents → Ranked, deduplicated ─────────────────────────────
+    let mut final_results: Vec<SearchResult> = Vec::with_capacity(TOP_K);
+    let mut seen_paths: HashSet<String> = HashSet::with_capacity(TOP_K * 2);
 
     for r in recents {
         if seen_paths.insert(r.item.path.clone()) {
@@ -168,12 +219,9 @@ pub fn search_items(
         }
     }
 
-    let mut file_results: Vec<SearchResult> = final_results.into_iter().take(40).collect();
+    let mut file_results: Vec<SearchResult> = final_results.into_iter().take(TOP_K).collect();
 
-    // ── 6. Ambient Intent Layer ──────────────────────────────────────────────
-    // We only show these if:
-    // 1. No specific filter is active (Universal Search)
-    // 2. The `command:` filter is explicitly active
+    // ── 8. Ambient Intent Layer ──────────────────────────────────────────────
     let is_command_filter = forced_category == Some("COMMAND");
     let has_other_filter = (forced_category.is_some() && !is_command_filter) || forced_item_type.is_some();
 
@@ -210,13 +258,7 @@ fn detect_ambient_intent(
                 format!("{:.6}", result).trim_end_matches('0').trim_end_matches('.').to_string()
             };
             let display = format!("{} = {}", query.trim(), formatted);
-            let synthetic = SearchItem {
-                name: display.clone(),
-                path: String::new(),
-                icon: None,
-                item_type: crate::indexer::ItemType::File,
-                category: "COMMAND".to_string(),
-            };
+            let synthetic = SearchItem::synthetic(display.clone(), "", "COMMAND");
             results.push(SearchResult { item: synthetic, inline_display: Some(display) });
         }
     }
@@ -239,20 +281,21 @@ fn detect_ambient_intent(
         let is_match = if force_all && is_empty { 
             true 
         } else { 
-            q == *keyword || q.starts_with(keyword) || matcher.fuzzy_match(keyword, &q).is_some()
+            // Exact match or deliberate prefix (>= 4 chars). Never loosely fuzzy-match power commands!
+            q == *keyword || (q.len() >= 4 && keyword.starts_with(&q))
         };
         
         if is_match {
             // Avoid duplicate matches (e.g. "shutdown" and "shut down")
             let already_added = results.iter().any(|r: &SearchResult| r.item.path == *cmd_path);
             if !already_added {
-                let synthetic = SearchItem {
-                    name: label.to_string(),
-                    path: cmd_path.to_string(),
-                    icon: Some(icon.to_string()),
-                    item_type: crate::indexer::ItemType::File,
-                    category: "COMMAND".to_string(),
-                };
+                let synthetic = SearchItem::new(
+                    label.to_string(),
+                    cmd_path.to_string(),
+                    Some(icon.to_string()),
+                    crate::indexer::ItemType::File,
+                    "COMMAND".to_string(),
+                );
                 results.push(SearchResult::from(synthetic));
             }
         }
@@ -268,13 +311,13 @@ fn detect_ambient_intent(
         };
         
         if is_match {
-            let synthetic = SearchItem {
-                name: alias.clone(),
-                path: format!("COMMAND:{}", url),
-                icon: Some("link-2".to_string()),
-                item_type: crate::indexer::ItemType::File,
-                category: "WEB SHORTCUT".to_string(),
-            };
+            let synthetic = SearchItem::new(
+                alias.clone(),
+                format!("COMMAND:{}", url),
+                Some("link-2".to_string()),
+                crate::indexer::ItemType::File,
+                "WEB SHORTCUT".to_string(),
+            );
             results.push(SearchResult::from(synthetic));
         }
     }
@@ -288,37 +331,27 @@ fn detect_ambient_intent(
         let is_url = is_web_prefix || (has_web_tld && !q.contains(' '));
 
         if is_url {
-            // Option 1: Open
             let open_path = if q.starts_with("http") { q.to_string() } else { format!("https://{}", q) };
-            results.push(SearchResult::from(SearchItem {
-                name: format!("Open {}", q),
-                path: format!("COMMAND:{}", open_path),
-                icon: Some("globe".to_string()),
-                item_type: crate::indexer::ItemType::File,
-                category: "WEB".to_string(),
-            }));
-
-            // Option 2: Save
-            results.push(SearchResult::from(SearchItem {
-                name: format!("Save {} as shortcut...", q),
-                path: format!("CREATE_SHORTCUT:{}", open_path),
-                icon: Some("bookmark".to_string()),
-                item_type: crate::indexer::ItemType::File,
-                category: "WEB".to_string(),
-            }));
+            results.push(SearchResult::from(SearchItem::new(
+                format!("Open {}", q),
+                format!("COMMAND:{}", open_path),
+                Some("globe".to_string()),
+                crate::indexer::ItemType::File,
+                "WEB".to_string(),
+            )));
         }
     }
 
     // ── Management: Clear Shortcuts ──────────────────────────────────────────
     let is_clear_match = if force_all && is_empty { true } else { q == "clear shortcuts" || q == "> clear shortcuts" };
     if is_clear_match {
-        results.push(SearchResult::from(SearchItem {
-            name: "Wipe all saved shortcuts".to_string(),
-            path: "CLEAR_SHORTCUTS".to_string(),
-            icon: Some("trash-2".to_string()),
-            item_type: crate::indexer::ItemType::File,
-            category: "COMMAND".to_string(),
-        }));
+        results.push(SearchResult::from(SearchItem::new(
+            "Wipe all saved shortcuts".to_string(),
+            "CLEAR_SHORTCUTS".to_string(),
+            Some("trash-2".to_string()),
+            crate::indexer::ItemType::File,
+            "COMMAND".to_string(),
+        )));
     }
 
     // ── Currency Conversion ───────────────────────────────────────────────────
@@ -349,68 +382,32 @@ fn is_math_expression(query: &str) -> bool {
 fn handle_command(query: &str, registry: &CommandRegistry) -> Vec<SearchResult> {
     match registry.handle(query) {
         Some(CommandResult::Display(text)) => {
-            let synthetic = SearchItem {
-                name: text.clone(),
-                path: String::new(),
-                icon: None,
-                item_type: crate::indexer::ItemType::File,
-                category: "COMMAND".to_string(),
-            };
+            let synthetic = SearchItem::synthetic(text.clone(), "", "COMMAND");
             vec![SearchResult { item: synthetic, inline_display: Some(text) }]
         }
         Some(CommandResult::Launch(_, _)) | Some(CommandResult::Silent) => {
-            let synthetic = SearchItem {
-                name: format!("Run: > {}", query.trim_start_matches('>')),
-                path: format!("COMMAND:{}", query),
-                icon: None,
-                item_type: crate::indexer::ItemType::File,
-                category: "COMMAND".to_string(),
-            };
+            let synthetic = SearchItem::synthetic(
+                format!("Run: > {}", query.trim_start_matches('>')),
+                format!("COMMAND:{}", query),
+                "COMMAND",
+            );
             vec![SearchResult::from(synthetic)]
         }
         Some(CommandResult::Error(err)) => {
-            let synthetic = SearchItem {
-                name: err.clone(),
-                path: String::new(),
-                icon: None,
-                item_type: crate::indexer::ItemType::File,
-                category: "COMMAND".to_string(),
-            };
+            let synthetic = SearchItem::synthetic(err.clone(), "", "COMMAND");
             vec![SearchResult { item: synthetic, inline_display: Some(err) }]
         }
         None => {
             let hints = registry.all_hints();
             hints.into_iter().map(|(prefix, desc)| {
-                let synthetic = SearchItem {
-                    name: format!("> {}  — {}", prefix, desc),
-                    path: String::new(),
-                    icon: None,
-                    item_type: crate::indexer::ItemType::File,
-                    category: "COMMAND".to_string(),
-                };
+                let synthetic = SearchItem::synthetic(
+                    format!("> {}  — {}", prefix, desc),
+                    "",
+                    "COMMAND",
+                );
                 SearchResult { item: synthetic, inline_display: None }
             }).collect()
         }
-    }
-}
-
-// ── Acronym Matching ─────────────────────────────────────────────────────────
-
-/// Returns a score when `query` matches the initials of words in `name`.
-/// e.g. "np" matches "Notepad" (N·o·t·e·p·a·d), "wt" matches "Windows Terminal"
-fn acronym_match(name: &str, query: &str) -> Option<i64> {
-    let initials: String = name
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|w| !w.is_empty())
-        .filter_map(|w| w.chars().next())
-        .collect::<String>()
-        .to_lowercase();
-
-    let q = query.to_lowercase();
-    if initials.starts_with(&q) {
-        Some(200 + (q.len() as i64 * 10))
-    } else {
-        None
     }
 }
 
@@ -419,6 +416,7 @@ fn acronym_match(name: &str, query: &str) -> Option<i64> {
 fn build_recents(
     history_manager: &HistoryManager,
     items: &[SearchItem],
+    path_lookup: &HashMap<String, usize>,
     forced_category: Option<&str>,
     forced_item_type: Option<&crate::indexer::ItemType>,
     matcher: Option<(&SkimMatcherV2, &str)>,
@@ -447,13 +445,17 @@ fn build_recents(
 
             Some(SearchItem {
                 name: format!("⚡ {}", name),
+                normalized_name: format!("⚡ {}", name).to_lowercase(),
+                acronym: String::new(),
                 path: record.path.clone(),
                 icon: None,
                 item_type: crate::indexer::ItemType::File,
                 category: "RECENT".to_string(),
             })
         } else {
-            items.iter().find(|i| i.path == record.path).and_then(|cached| {
+            // O(1) index lookup via path_lookup HashMap
+            path_lookup.get(&record.path).and_then(|&idx| {
+                let cached = &items[idx];
                 if let Some(cat) = forced_category {
                     if cached.category != cat {
                         return None;
@@ -484,3 +486,4 @@ fn build_recents(
 
     recents
 }
+

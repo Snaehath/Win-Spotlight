@@ -119,9 +119,22 @@ fn main() {
 
             // ── In-memory cache for instant first-keystroke response ────────
             let items = scan_items(Some(&icon_cache));
+            let mut lookup = std::collections::HashMap::with_capacity(items.len());
+            let mut app_indices = Vec::new();
+            for (idx, item) in items.iter().enumerate() {
+                lookup.insert(item.path.clone(), idx);
+                if item.category == "APP" {
+                    app_indices.push(idx);
+                }
+            }
             let cache_arc = Arc::new(Mutex::new(items));
+            let path_lookup_arc = Arc::new(Mutex::new(lookup));
+            let app_indices_arc = Arc::new(Mutex::new(app_indices));
+
             app.manage(AppCache {
                 apps: cache_arc.clone(),
+                path_lookup: path_lookup_arc.clone(),
+                app_indices: app_indices_arc.clone(),
             });
 
             // ── Initial bulk index & Vacuum (background — non-blocking) ─────
@@ -164,6 +177,8 @@ fn main() {
                 watcher::start_watcher(
                     engine.clone(),
                     cache_arc.clone(),
+                    path_lookup_arc.clone(),
+                    app_indices_arc.clone(),
                     icon_cache.clone(),
                     watch_paths,
                 );
