@@ -6,7 +6,7 @@
   "scripts": {
     "tauri": "tauri",
     "test": "cd src-tauri && cargo test -- --nocapture",
-    "build:release": "npm run tauri build && node compress.js"
+    "build:release": "npm run tauri build"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"
