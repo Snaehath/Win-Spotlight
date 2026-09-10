@@ -1,13 +1,11 @@
-<p align="center">
-  <img src="public/app_icon.png" width="100" height="100" alt="Spotlight-Win Icon" />
-</p>
-
-<h1 align="center">Spotlight-Win</h1>
-
-<p align="center">
-  <strong>The fastest way to find or launch anything on your Windows PC.</strong><br>
-  Zero setup. Zero ads. Zero learning curve. Just press <kbd>Ctrl</kbd> + <kbd>Space</kbd> and type.
-</p>
+<div align="center">
+  <img src="public/app_icon.png" width="96" height="96" alt="Spotlight-Win Icon" />
+  <h1>Spotlight-Win</h1>
+  <p>
+    <strong>The fastest way to find or launch anything on your Windows PC.</strong><br />
+    Zero setup. Zero ads. Zero learning curve. Just press <kbd>Ctrl</kbd> + <kbd>Space</kbd> and type.
+  </p>
+</div>
 
 ---
 
