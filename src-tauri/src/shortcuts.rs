@@ -20,7 +20,10 @@ impl ShortcutManager {
         let mut path = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
         let _ = fs::create_dir_all(&path);
         path.push("shortcuts.json");
+        Self::with_path(path)
+    }
 
+    pub fn with_path(path: PathBuf) -> Self {
         let data = if let Ok(content) = fs::read_to_string(&path) {
             serde_json::from_str(&content).unwrap_or_default()
         } else {

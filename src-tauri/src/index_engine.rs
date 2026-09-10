@@ -56,21 +56,35 @@ impl IndexEngine {
         std::fs::create_dir_all(index_dir).ok();
         let schema_def = SpotlightSchema::build();
 
-        let index = if index_dir.join("meta.json").exists() {
-            let existing = Index::open_in_dir(index_dir)?;
-            if existing.schema() != schema_def.schema {
-                // Schema mismatch (version upgrade) — safely wipe and rebuild
-                let _ = std::fs::remove_dir_all(index_dir);
-                let _ = std::fs::create_dir_all(index_dir);
-                Index::create_in_dir(index_dir, schema_def.schema.clone())?
-            } else {
-                existing
+        let try_open = || -> tantivy::Result<(Index, IndexWriter)> {
+            if index_dir.join("meta.json").exists() {
+                if let Ok(existing) = Index::open_in_dir(index_dir) {
+                    if existing.schema() == schema_def.schema {
+                        if let Ok(writer) = existing.writer(50_000_000) {
+                            return Ok((existing, writer));
+                        }
+                    }
+                }
             }
-        } else {
-            Index::create_in_dir(index_dir, schema_def.schema.clone())?
+            let _ = std::fs::remove_dir_all(index_dir);
+            let _ = std::fs::create_dir_all(index_dir);
+            let index = Index::create_in_dir(index_dir, schema_def.schema.clone())?;
+            let writer = index.writer(50_000_000)?;
+            Ok((index, writer))
         };
 
-        let writer = index.writer(50_000_000)?;
+        let (index, writer) = match try_open() {
+            Ok(pair) => pair,
+            Err(_) => {
+                // Self-healing fallback: wipe corrupted directory and recreate cleanly
+                let _ = std::fs::remove_dir_all(index_dir);
+                let _ = std::fs::create_dir_all(index_dir);
+                let fresh_index = Index::create_in_dir(index_dir, schema_def.schema.clone())?;
+                let fresh_writer = fresh_index.writer(50_000_000)?;
+                (fresh_index, fresh_writer)
+            }
+        };
+
         let reader = index
             .reader_builder()
             .reload_policy(ReloadPolicy::OnCommitWithDelay)

@@ -487,3 +487,88 @@ fn build_recents(
     recents
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_acronym_generation() {
+        let item = SearchItem::new(
+            "Windows Terminal".to_string(),
+            "C:\\wt.exe".to_string(),
+            None,
+            crate::indexer::ItemType::App,
+            "APP".to_string(),
+        );
+        assert_eq!(item.acronym, "wt");
+
+        let vs_code = SearchItem::new(
+            "Visual Studio Code".to_string(),
+            "C:\\Code.exe".to_string(),
+            None,
+            crate::indexer::ItemType::App,
+            "APP".to_string(),
+        );
+        assert_eq!(vs_code.acronym, "vsc");
+    }
+
+    #[test]
+    fn test_math_detection() {
+        assert!(is_math_expression("45 * 12"));
+        assert!(is_math_expression("100 / 4"));
+        assert!(is_math_expression("2^8"));
+        assert!(is_math_expression("sqrt(144)"));
+        assert!(!is_math_expression("chrome"));
+        assert!(!is_math_expression("readme.md"));
+    }
+
+    #[test]
+    fn test_folder_clean_name() {
+        let item = SearchItem::new(
+            "spotlight-win".to_string(),
+            "D:\\Projects\\spotlight-win".to_string(),
+            None,
+            crate::indexer::ItemType::Folder,
+            "FOLDER".to_string(),
+        );
+        assert_eq!(item.name, "spotlight-win");
+        assert_eq!(item.normalized_name, "spotlight-win");
+        assert!(item.normalized_name.starts_with("spotlight"));
+    }
+
+    #[test]
+    fn test_system_command_safeguard_invariants() {
+        let matcher = SkimMatcherV2::default();
+        let temp_file = std::env::temp_dir().join("test_spotlight_shortcuts_1.json");
+        let shortcut_manager = crate::shortcuts::ShortcutManager::with_path(temp_file);
+
+        // Deliberate commands must trigger
+        let res_shutdown = detect_ambient_intent("shutdown", &shortcut_manager, false, &matcher);
+        assert!(res_shutdown.iter().any(|r| r.item.name.contains("Shut Down")));
+
+        let res_restart = detect_ambient_intent("restart", &shortcut_manager, false, &matcher);
+        assert!(res_restart.iter().any(|r| r.item.name.contains("Restart")));
+
+        // Accidental or under-length prefixes (< 4 chars) must NOT trigger destructive actions
+        let res_accidental = detect_ambient_intent("shu", &shortcut_manager, false, &matcher);
+        assert!(!res_accidental.iter().any(|r| r.item.name.contains("Shut Down")));
+
+        let res_res = detect_ambient_intent("res", &shortcut_manager, false, &matcher);
+        assert!(!res_res.iter().any(|r| r.item.name.contains("Restart")));
+    }
+
+    #[test]
+    fn test_url_single_focused_action() {
+        let matcher = SkimMatcherV2::default();
+        let temp_file = std::env::temp_dir().join("test_spotlight_shortcuts_2.json");
+        let shortcut_manager = crate::shortcuts::ShortcutManager::with_path(temp_file);
+
+        let results = detect_ambient_intent("github.com", &shortcut_manager, false, &matcher);
+        let url_actions: Vec<_> = results.iter().filter(|r| r.item.category == "WEB").collect();
+        
+        // Invariant: Exactly one primary "Open" action must be presented
+        assert_eq!(url_actions.len(), 1, "URL typing must yield exactly 1 focused action");
+        assert!(url_actions[0].item.name.starts_with("Open github.com"));
+    }
+}
+
