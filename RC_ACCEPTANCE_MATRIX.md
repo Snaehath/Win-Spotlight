@@ -21,6 +21,11 @@ This document defines the formal exit criteria for **Spotlight-Win v1.0 Release 
   - [x] Holding <kbd>Enter</kbd> launches the selected target at most once (OS `e.repeat` discarded).
   - [x] Rapid physical double-tapping of <kbd>Enter</kbd> launches at most once (`isActivating` session lock).
   - [x] Opening a new launcher session (<kbd>Ctrl</kbd> + <kbd>Space</kbd> / `window-shown`) cleanly resets the lock.
+- [x] **Intentional Multi-Instance Invariant**:
+  - [x] First launch of an application opens immediately with zero prompt.
+  - [x] Subsequent launch of an already-running application displays a confirmation prompt: *"Do you want to open another [App] window / instance?"* with `[Cancel]` and `[Open another]`.
+  - [x] <kbd>Enter</kbd> confirms "Open another"; <kbd>Esc</kbd> cancels and refocuses search input without spawning duplicate instances.
+  - [x] Non-app targets (URLs, files, folders, calculators, system commands) bypass running-process checks entirely.
 
 ---
 

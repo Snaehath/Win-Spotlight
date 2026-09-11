@@ -357,6 +357,34 @@ async function launchSelected(path, e) {
     }
   }
 
+  // ── Intentional Multi-Instance Confirmation ──
+  const isApp = (item && item.category === "APP") || lowerPath.endsWith(".exe") || lowerPath.endsWith(".lnk");
+  if (isApp && !path.startsWith("COMMAND:")) {
+    try {
+      const runningInfo = await invoke("check_app_running", { path });
+      if (runningInfo && runningInfo.is_running) {
+        const appTitle = runningInfo.app_name || (item ? item.name : "Application");
+        const isWindowed = runningInfo.kind === "window";
+        const message = isWindowed
+          ? `Do you want to open another ${appTitle} window?`
+          : `Do you want to launch another instance?`;
+
+        const confirmed = await showConfirm(
+          `${appTitle} is already running`,
+          message,
+          searchInput,
+          { okText: "Open another", cancelText: "Cancel" }
+        );
+        if (!confirmed) {
+          releaseLock();
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("Could not check running app status:", err);
+    }
+  }
+
   // ── Actual Launch Execution ──
   try {
     const shouldHide = await invoke("launch_app", { path });

@@ -15,11 +15,12 @@ mod index_engine;
 mod watcher;
 mod currency;
 mod system_info;
+mod process;
 
 use std::sync::{Arc, Mutex};
 use indexer::{scan_items, get_base_scan_paths};
 use search::{search_items, AppCache, IndexState, CommandState};
-use launcher::{launch_app, reveal_in_explorer};
+use launcher::{launch_app, reveal_in_explorer, check_app_running};
 use history::HistoryManager;
 use commands::CommandRegistry;
 use index_engine::IndexEngine;
@@ -256,6 +257,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             search_items,
             launch_app,
+            check_app_running,
             toggle_window,
             hide_window,
             save_shortcut,

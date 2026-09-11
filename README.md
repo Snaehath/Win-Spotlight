@@ -97,6 +97,7 @@ Spotlight-Win combines a responsive web frontend with a high-performance native 
 - **In-Memory Caching & $O(1)$ Mapping**: Extracted Windows binary icons, precomputed normalized names, acronyms, and path lookup maps avoid disk I/O and per-keystroke allocations.
 - **Debounced Incremental Watcher**: Real-time filesystem changes (Desktop, Start Menu, User Folders) batch-update without UI stutter or SSD thrashing.
 - **Single Activation Invariant**: A single launcher session can activate a selected result at most once. Repeated <kbd>Enter</kbd> keydowns, OS key-repeat, and concurrent activation attempts are consumed idempotently until a new session is initiated.
+- **Intentional Multi-Instance Invariant**: Distinguishes accidental within-session repeats from deliberate multi-window launches across sessions. Launching an already-running app prompts for confirmation (*"Do you want to open another Chrome window / instance?"*) with <kbd>Enter</kbd> confirming and <kbd>Esc</kbd> safely cancelling. Non-app targets execute immediately.
 - **Failsafe System Actions**: Destructive actions (shutdown, restart) require deliberate keywords and trigger confirmation prompts before execution.
 
 ---
@@ -132,11 +133,12 @@ Standalone setup files and binaries will be generated in `src-tauri/target/relea
 
 ---
 
-## 🎯 v1.0 Release Candidate Hardening Roadmap
+## 🎯 Product Roadmap & Release Hardening
 
-Spotlight-Win is operating under an active **feature freeze** to focus exclusively on production reliability, Windows integration, and friction removal.
+Spotlight-Win is operating under an active **feature freeze** for its upcoming Release Candidate to focus exclusively on production reliability, Windows integration, and friction removal.
 
-Detailed release exit criteria and soak testing protocols are tracked in [`RC_ACCEPTANCE_MATRIX.md`](file:///d:/DevelopmentSide/AI-Studio/spotlight-win/RC_ACCEPTANCE_MATRIX.md).
+- 🗺️ **Long-Term Vision**: See [**ROADMAP.md**](file:///d:/DevelopmentSide/AI-Studio/spotlight-win/ROADMAP.md) for our full 12–18 month plan evolving Spotlight-Win into the fastest command surface for Windows (Personalization &rarr; System Actions &rarr; Clipboard &rarr; Workflows &rarr; Local AI).
+- 📋 **Release Candidate Checklist**: Detailed release exit criteria and soak testing protocols are tracked in [`RC_ACCEPTANCE_MATRIX.md`](file:///d:/DevelopmentSide/AI-Studio/spotlight-win/RC_ACCEPTANCE_MATRIX.md).
 
 - [x] **Bounded Two-Stage Search**: Tantivy candidate retrieval with bounded personal ranking and zero-allocation metadata.
 - [x] **Self-Healing Index Recovery**: Automatic transparent recovery from unexpected process kills and corrupt cache states.

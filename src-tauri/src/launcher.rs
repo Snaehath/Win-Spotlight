@@ -71,3 +71,12 @@ pub fn reveal_in_explorer(path: String) -> Result<(), String> {
 
     Ok(())
 }
+
+#[tauri::command]
+pub fn check_app_running(path: String) -> Result<Option<crate::process::RunningAppInfo>, String> {
+    let lower = path.to_lowercase();
+    if !lower.ends_with(".exe") && !lower.ends_with(".lnk") {
+        return Ok(None);
+    }
+    Ok(crate::process::check_app_is_running(&path))
+}
