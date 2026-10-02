@@ -1,6 +1,7 @@
 pub mod icons;
 pub mod scanner;
 pub mod cache;
+pub mod identity;
 
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -32,6 +33,8 @@ pub struct SearchItem {
     pub normalized_name: String,
     #[serde(skip)]
     pub acronym: String,
+    #[serde(skip)]
+    pub alternate_paths: Vec<String>,
 }
 
 impl SearchItem {
@@ -58,6 +61,7 @@ impl SearchItem {
             category,
             normalized_name,
             acronym,
+            alternate_paths: Vec::new(),
         }
     }
 
@@ -239,5 +243,57 @@ pub fn scan_items(cache: Option<&IconCache>) -> Vec<SearchItem> {
 
     items.sort_by(|a, b| a.name.cmp(&b.name));
     items.dedup_by(|a, b| a.name == b.name && a.path == b.path);
-    items
+    deduplicate_apps(items)
+}
+
+/// Canonical application entity deduplication.
+/// Groups shortcuts and executables by AppIdentity, choosing the highest priority representation
+/// (Start Menu > System32 > Desktop > raw exe) as primary and preserving all other representations
+/// in `alternate_paths`.
+pub fn deduplicate_apps(items: Vec<SearchItem>) -> Vec<SearchItem> {
+    use std::collections::HashMap;
+    use crate::indexer::identity::{resolve_app_identity, representation_priority};
+
+    let mut non_apps = Vec::new();
+    let mut app_entities: HashMap<String, SearchItem> = HashMap::new();
+
+    for item in items {
+        if item.category == "APP" {
+            let identity = resolve_app_identity(Path::new(&item.path));
+            let item_prio = representation_priority(&item.path);
+
+            match app_entities.entry(identity.key) {
+                std::collections::hash_map::Entry::Vacant(e) => {
+                    e.insert(item);
+                }
+                std::collections::hash_map::Entry::Occupied(mut e) => {
+                    let existing = e.get_mut();
+                    let existing_prio = representation_priority(&existing.path);
+
+                    if item_prio > existing_prio {
+                        let old_path = existing.path.clone();
+                        let mut alt_paths = std::mem::take(&mut existing.alternate_paths);
+                        if !alt_paths.contains(&old_path) {
+                            alt_paths.push(old_path);
+                        }
+
+                        let mut new_primary = item;
+                        new_primary.alternate_paths = alt_paths;
+                        *existing = new_primary;
+                    } else {
+                        if !existing.alternate_paths.contains(&item.path) && existing.path != item.path {
+                            existing.alternate_paths.push(item.path);
+                        }
+                    }
+                }
+            }
+        } else {
+            non_apps.push(item);
+        }
+    }
+
+    let mut result: Vec<SearchItem> = app_entities.into_values().chain(non_apps).collect();
+    result.sort_by(|a, b| a.name.cmp(&b.name));
+    result.dedup_by(|a, b| a.name == b.name && a.path == b.path);
+    result
 }

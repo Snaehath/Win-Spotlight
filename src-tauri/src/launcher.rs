@@ -37,7 +37,7 @@ pub fn launch_app(
     if !is_url {
         let is_valid = {
             let items = cache.apps.lock().unwrap();
-            items.iter().any(|item| item.path == path)
+            items.iter().any(|item| item.path == path || item.alternate_paths.contains(&path))
         };
         
         if !is_valid {

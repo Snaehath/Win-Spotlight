@@ -451,6 +451,7 @@ fn build_recents(
                 icon: None,
                 item_type: crate::indexer::ItemType::File,
                 category: "RECENT".to_string(),
+                alternate_paths: Vec::new(),
             })
         } else {
             // O(1) index lookup via path_lookup HashMap

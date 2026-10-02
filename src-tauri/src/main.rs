@@ -120,10 +120,13 @@ fn main() {
 
             // ── In-memory cache for instant first-keystroke response ────────
             let items = scan_items(Some(&icon_cache));
-            let mut lookup = std::collections::HashMap::with_capacity(items.len());
+            let mut lookup = std::collections::HashMap::with_capacity(items.len() * 2);
             let mut app_indices = Vec::new();
             for (idx, item) in items.iter().enumerate() {
                 lookup.insert(item.path.clone(), idx);
+                for alt_path in &item.alternate_paths {
+                    lookup.insert(alt_path.clone(), idx);
+                }
                 if item.category == "APP" {
                     app_indices.push(idx);
                 }

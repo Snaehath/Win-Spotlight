@@ -83,6 +83,9 @@ fn process_event(
                 app_indices_lock.clear();
                 for (idx, itm) in lock.iter().enumerate() {
                     lookup_lock.insert(itm.path.clone(), idx);
+                    for alt_path in &itm.alternate_paths {
+                        lookup_lock.insert(alt_path.clone(), idx);
+                    }
                     if itm.category == "APP" {
                         app_indices_lock.push(idx);
                     }
@@ -100,6 +103,9 @@ fn process_event(
                 app_indices_lock.clear();
                 for (idx, itm) in lock.iter().enumerate() {
                     lookup_lock.insert(itm.path.clone(), idx);
+                    for alt_path in &itm.alternate_paths {
+                        lookup_lock.insert(alt_path.clone(), idx);
+                    }
                     if itm.category == "APP" {
                         app_indices_lock.push(idx);
                     }

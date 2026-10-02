@@ -32,13 +32,7 @@ impl IntentEngine {
 
         for (keyword, label, cmd_path) in sys_actions {
             if q_lower == *keyword {
-                intents.push(SearchItem {
-                    name: label.to_string(),
-                    path: cmd_path.to_string(),
-                    icon: None,
-                    item_type: crate::indexer::ItemType::File,
-                    category: "COMMAND".to_string(),
-                });
+                intents.push(SearchItem::synthetic(*label, *cmd_path, "COMMAND"));
             }
         }
 
