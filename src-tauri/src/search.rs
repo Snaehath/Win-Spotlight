@@ -25,14 +25,127 @@ pub struct CommandState(pub CommandRegistry);
 pub struct SearchResult {
     #[serde(flatten)]
     pub item: SearchItem,
+    /// Semantic role or location context (breadcrumbs, "System utility", etc.)
+    pub subtitle: Option<String>,
     /// If set, render this inline in the result row instead of the path.
     pub inline_display: Option<String>,
 }
 
+impl SearchResult {
+    pub fn new(item: SearchItem) -> Self {
+        let subtitle = compute_semantic_subtitle(&item);
+        SearchResult {
+            item,
+            subtitle,
+            inline_display: None,
+        }
+    }
+
+    pub fn with_inline_display(item: SearchItem, display: String) -> Self {
+        SearchResult {
+            item,
+            subtitle: None,
+            inline_display: Some(display),
+        }
+    }
+}
+
 impl From<SearchItem> for SearchResult {
     fn from(item: SearchItem) -> Self {
-        SearchResult { item, inline_display: None }
+        SearchResult::new(item)
     }
+}
+
+/// Extracts clean parent directory breadcrumbs for files and folders.
+/// For files: "folder > subfolder" (e.g. "spotlight-win > docs" or "Downloads")
+/// For folders: "in parent_folder" (e.g. "in AI-Studio")
+pub fn clean_parent_breadcrumb(path_str: &str, is_folder: bool) -> Option<String> {
+    let p = std::path::Path::new(path_str);
+    let parent = p.parent()?;
+    
+    let mut components = Vec::new();
+    let mut curr = Some(parent);
+    
+    while let Some(dir) = curr {
+        if let Some(name) = dir.file_name().and_then(|n| n.to_str()) {
+            if !name.is_empty() && name != "." && name != ".." {
+                components.push(name);
+                if components.len() >= 2 {
+                    break;
+                }
+            }
+        }
+        curr = dir.parent();
+    }
+    
+    if components.is_empty() {
+        return None;
+    }
+    
+    components.reverse();
+    
+    if is_folder {
+        let parent_name = components.last()?;
+        Some(format!("in {}", parent_name))
+    } else {
+        Some(components.join(" > "))
+    }
+}
+
+/// Computes a user-meaningful semantic subtitle for a SearchItem.
+/// Apps display NO raw filesystem paths; system utilities display roles;
+/// files and folders display clean contextual breadcrumbs.
+pub fn compute_semantic_subtitle(item: &SearchItem) -> Option<String> {
+    // 1. Applications: regular apps display NO subtitle; system tools show role
+    if item.item_type == crate::indexer::ItemType::App {
+        let lower = item.name.to_lowercase();
+        if lower.contains("disk cleanup")
+            || lower.contains("device manager")
+            || lower.contains("task manager")
+            || lower.contains("registry editor")
+            || lower.contains("system configuration")
+            || lower.contains("event viewer")
+        {
+            return Some("System utility".to_string());
+        } else if lower.contains("powershell") || lower.contains("command prompt") || lower == "cmd" {
+            return Some("Terminal".to_string());
+        } else {
+            return None;
+        }
+    }
+
+    // 2. Commands & System Actions
+    if item.category == "COMMAND" {
+        if item.path.contains("> sys") {
+            return Some("System action".to_string());
+        } else if item.path.contains("> health") {
+            return Some("System diagnostic".to_string());
+        } else {
+            return Some("Command".to_string());
+        }
+    }
+
+    // 3. Web Shortcuts & URLs
+    if item.category == "WEB" || item.category == "WEB SHORTCUT" {
+        if item.path.starts_with("COMMAND:http://") || item.path.starts_with("COMMAND:https://") {
+            let url_str = item.path.strip_prefix("COMMAND:").unwrap_or(&item.path);
+            if let Ok(url) = reqwest::Url::parse(url_str) {
+                return Some(url.host_str().unwrap_or("Open in browser").to_string());
+            } else {
+                return Some("Open in browser".to_string());
+            }
+        } else {
+            return Some("Web shortcut".to_string());
+        }
+    }
+
+    // 4. Folders
+    if item.item_type == crate::indexer::ItemType::Folder || item.category == "FOLDER" {
+        return clean_parent_breadcrumb(&item.path, true);
+    }
+
+    // 5. Files (DOC, CODE, IMG, VID, AUDIO, ARCHIVE, XLS, PPT, FILE)
+    clean_parent_breadcrumb(&item.path, false)
 }
 
 // search
@@ -259,7 +372,7 @@ fn detect_ambient_intent(
             };
             let display = format!("{} = {}", query.trim(), formatted);
             let synthetic = SearchItem::synthetic(display.clone(), "", "COMMAND");
-            results.push(SearchResult { item: synthetic, inline_display: Some(display) });
+            results.push(SearchResult::with_inline_display(synthetic, display));
         }
     }
 
@@ -383,7 +496,7 @@ fn handle_command(query: &str, registry: &CommandRegistry) -> Vec<SearchResult> 
     match registry.handle(query) {
         Some(CommandResult::Display(text)) => {
             let synthetic = SearchItem::synthetic(text.clone(), "", "COMMAND");
-            vec![SearchResult { item: synthetic, inline_display: Some(text) }]
+            vec![SearchResult::with_inline_display(synthetic, text)]
         }
         Some(CommandResult::Launch(_, _)) | Some(CommandResult::Silent) => {
             let synthetic = SearchItem::synthetic(
@@ -395,7 +508,7 @@ fn handle_command(query: &str, registry: &CommandRegistry) -> Vec<SearchResult> 
         }
         Some(CommandResult::Error(err)) => {
             let synthetic = SearchItem::synthetic(err.clone(), "", "COMMAND");
-            vec![SearchResult { item: synthetic, inline_display: Some(err) }]
+            vec![SearchResult::with_inline_display(synthetic, err)]
         }
         None => {
             let hints = registry.all_hints();
@@ -405,7 +518,7 @@ fn handle_command(query: &str, registry: &CommandRegistry) -> Vec<SearchResult> 
                     "",
                     "COMMAND",
                 );
-                SearchResult { item: synthetic, inline_display: None }
+                SearchResult::from(synthetic)
             }).collect()
         }
     }
@@ -613,6 +726,53 @@ mod tests {
         assert_eq!(video_cand[0].0, "C:\\Videos\\intro.mp4");
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_semantic_subtitles_for_apps_files_and_folders() {
+        // 1. Regular application: NO raw path
+        let app = SearchItem::new(
+            "Discord".to_string(),
+            r"C:\Users\User\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Discord.lnk".to_string(),
+            None,
+            crate::indexer::ItemType::App,
+            "APP".to_string(),
+        );
+        let res = SearchResult::from(app);
+        assert_eq!(res.subtitle, None, "Regular app should not display a raw path!");
+
+        // 2. System utility: shows role
+        let tool = SearchItem::new(
+            "Disk Cleanup".to_string(),
+            r"C:\Windows\System32\cleanmgr.exe".to_string(),
+            None,
+            crate::indexer::ItemType::App,
+            "APP".to_string(),
+        );
+        let res = SearchResult::from(tool);
+        assert_eq!(res.subtitle, Some("System utility".to_string()));
+
+        // 3. File: clean parent breadcrumb
+        let file = SearchItem::new(
+            "README.md".to_string(),
+            r"D:\DevelopmentSide\AI-Studio\spotlight-win\README.md".to_string(),
+            None,
+            crate::indexer::ItemType::File,
+            "DOC".to_string(),
+        );
+        let res = SearchResult::from(file);
+        assert_eq!(res.subtitle, Some("AI-Studio > spotlight-win".to_string()));
+
+        // 4. Folder: clean parent context
+        let folder = SearchItem::new(
+            "spotlight-win".to_string(),
+            r"D:\DevelopmentSide\AI-Studio\spotlight-win".to_string(),
+            None,
+            crate::indexer::ItemType::Folder,
+            "FOLDER".to_string(),
+        );
+        let res = SearchResult::from(folder);
+        assert_eq!(res.subtitle, Some("in AI-Studio".to_string()));
     }
 }
 

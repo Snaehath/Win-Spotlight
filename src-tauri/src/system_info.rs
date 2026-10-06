@@ -90,10 +90,7 @@ pub fn get_ram_usage() -> Option<SearchResult> {
         "COMMAND".to_string(),
     );
 
-    Some(SearchResult {
-        item: synthetic,
-        inline_display: Some(display),
-    })
+    Some(SearchResult::with_inline_display(synthetic, display))
 }
 
 pub fn get_cpu_usage() -> Option<SearchResult> {
@@ -153,10 +150,7 @@ pub fn get_cpu_usage() -> Option<SearchResult> {
         "COMMAND".to_string(),
     );
 
-    Some(SearchResult {
-        item: synthetic,
-        inline_display: Some(display),
-    })
+    Some(SearchResult::with_inline_display(synthetic, display))
 }
 
 pub fn get_disk_spaces() -> Vec<SearchResult> {
@@ -203,10 +197,7 @@ pub fn get_disk_spaces() -> Vec<SearchResult> {
                     "COMMAND".to_string(),
                 );
 
-                results.push(SearchResult {
-                    item: synthetic,
-                    inline_display: Some(display),
-                });
+                results.push(SearchResult::with_inline_display(synthetic, display));
             }
         }
     }

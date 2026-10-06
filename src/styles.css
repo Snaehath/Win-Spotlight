@@ -279,6 +279,7 @@ body {
 .app-info {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   min-width: 0;
   gap: 2px;
   flex: 1;
@@ -389,8 +390,15 @@ body {
   text-overflow: ellipsis;
 }
 
-.result-item.selected .app-path {
-  color: rgba(255, 255, 255, 0.7);
+.semantic-subtitle {
+  color: rgba(148, 163, 184, 0.55);
+  font-size: 0.74rem;
+  letter-spacing: 0.01em;
+}
+
+.result-item.selected .app-path,
+.result-item.selected .semantic-subtitle {
+  color: rgba(255, 255, 255, 0.75);
 }
 
 /* Custom Scrollbar */

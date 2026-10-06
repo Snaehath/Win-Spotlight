@@ -202,10 +202,7 @@ pub fn detect_currency_intent(query: &str) -> Vec<SearchResult> {
             let display = format!("{} {} = {} {}", a, f, formatted_amount, target);
             let web_search_query = format!("COMMAND:> g {} {} to {}", a, f, target);
             let synthetic = SearchItem::synthetic(display.clone(), web_search_query, "COMMAND");
-            results.push(SearchResult {
-                item: synthetic,
-                inline_display: Some(display),
-            });
+            results.push(SearchResult::with_inline_display(synthetic, display));
         }
     }
 

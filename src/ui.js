@@ -83,12 +83,12 @@ export function renderResults(
                  </div>`;
     }
 
-    // Sub-label
-    const subLabel = item.inline_display
-      ? `<span class="app-path inline-result">${escapeHtml(item.inline_display)}</span>`
-      : item.path
-        ? `<span class="app-path">${escapeHtml(item.path)}</span>`
-        : "";
+    // Sub-label: Priority to inline_display (math/currency), then semantic subtitle.
+    // If neither exists (standard applications), omit subLabel completely.
+    const subtitleText = item.inline_display || item.subtitle;
+    const subLabel = subtitleText
+      ? `<span class="app-path ${item.inline_display ? "inline-result" : "semantic-subtitle"}">${escapeHtml(subtitleText)}</span>`
+      : "";
 
     li.innerHTML = `
       ${iconHTML}
