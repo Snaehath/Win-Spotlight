@@ -123,33 +123,7 @@ body {
   opacity: 0.6;
 }
 
-.help-btn-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  opacity: 0.3;
-  transition: all 0.2s ease;
-  padding: 4px;
-  position: relative;
-  z-index: 10;
-}
 
-.help-btn-container:hover {
-  opacity: 1;
-  transform: scale(1.1);
-}
-
-.help-btn-icon {
-  width: 20px;
-  height: 20px;
-  color: var(--text-dim);
-  transition: color 0.2s ease;
-}
-
-.help-btn-container:hover .help-btn-icon {
-  color: var(--accent-primary);
-}
 
 #search-input {
   flex: 1;

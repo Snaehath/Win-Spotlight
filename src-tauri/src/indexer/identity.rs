@@ -83,18 +83,12 @@ pub fn resolve_app_identity(path: &Path) -> AppIdentity {
 
     if ext == "exe" {
         let file_name = path.file_name().and_then(|f| f.to_str()).unwrap_or(&stem).to_lowercase();
-        return AppIdentity::new(format!("exe:{}", file_name));
+        let exe_stem = file_name.strip_suffix(".exe").unwrap_or(&file_name);
+        return AppIdentity::new(format!("app:{}", exe_stem));
     }
 
     if ext == "lnk" {
-        // 1. Try reading AUMID from shortcut
-        if let Ok(bytes) = std::fs::read(path) {
-            if let Some(aumid) = extract_aumid_from_lnk(&bytes) {
-                return AppIdentity::new(format!("aumid:{}", aumid));
-            }
-        }
-
-        // 2. Try extracting candidate target executables from the shortcut
+        // 1. Try extracting candidate target executables from the shortcut
         let target_exes = extract_exes_from_lnk(path);
         
         // Filter out helper/updater executables (like Squirrel's update.exe)
@@ -104,7 +98,15 @@ pub fn resolve_app_identity(path: &Path) -> AppIdentity {
             .collect();
 
         if let Some(first_main_exe) = main_app_exes.first() {
-            return AppIdentity::new(format!("exe:{}", first_main_exe));
+            let exe_stem = first_main_exe.strip_suffix(".exe").unwrap_or(first_main_exe.as_str());
+            return AppIdentity::new(format!("app:{}", exe_stem));
+        }
+
+        // 2. Try reading AUMID from shortcut
+        if let Ok(bytes) = std::fs::read(path) {
+            if let Some(aumid) = extract_aumid_from_lnk(&bytes) {
+                return AppIdentity::new(format!("aumid:{}", aumid));
+            }
         }
 
         // 3. Fallback: normalize the shortcut stem
@@ -119,7 +121,7 @@ pub fn resolve_app_identity(path: &Path) -> AppIdentity {
             .trim()
             .to_string();
 
-        return AppIdentity::new(format!("stem:{}", cleaned_stem));
+        return AppIdentity::new(format!("app:{}", cleaned_stem));
     }
 
     // Default fallback
@@ -151,7 +153,7 @@ mod tests {
     fn test_exe_identity() {
         let p = Path::new(r"C:\Program Files\Google\Chrome\Application\chrome.exe");
         let id = resolve_app_identity(p);
-        assert_eq!(id.key, "exe:chrome.exe");
+        assert_eq!(id.key, "app:chrome");
     }
 
     #[test]
@@ -167,8 +169,7 @@ mod tests {
     fn test_stem_cleaning() {
         let p = Path::new(r"C:\Users\Test\Desktop\Discord - Shortcut.lnk");
         let id = resolve_app_identity(p);
-        // Either resolved from exe or fallback to cleaned stem "discord"
-        assert!(id.key == "stem:discord" || id.key == "exe:discord.exe");
+        assert_eq!(id.key, "app:discord");
     }
 
     #[test]

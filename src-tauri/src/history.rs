@@ -28,6 +28,10 @@ impl HistoryManager {
         let mut path = app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
         let _ = fs::create_dir_all(&path);
         path.push("history_v2.json");
+        Self::with_path(path)
+    }
+
+    pub fn with_path(path: PathBuf) -> Self {
         Self { 
             path,
             cache: std::sync::Mutex::new(None),

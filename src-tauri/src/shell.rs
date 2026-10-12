@@ -14,7 +14,7 @@ pub fn open_path_or_url(path: &str) -> Result<(), String> {
     // SAFETY: ShellExecuteW is a standard Win32 API. We provide valid wide-string pointers
     // and use SW_SHOWNORMAL to ensure the launched process is visible to the user.
     unsafe {
-        ShellExecuteW(
+        let res = ShellExecuteW(
             None,
             windows::core::w!("open"),
             PCWSTR(wide_path.as_ptr()),
@@ -22,6 +22,10 @@ pub fn open_path_or_url(path: &str) -> Result<(), String> {
             None,
             SW_SHOWNORMAL,
         );
+        let code = res.0 as usize;
+        if code <= 32 {
+            return Err(format!("ShellExecute error (code {})", code));
+        }
     }
     Ok(())
 }

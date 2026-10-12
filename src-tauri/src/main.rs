@@ -75,8 +75,31 @@ fn hide_window(app_handle: AppHandle) {
 
 
 #[tauri::command]
-fn remove_from_history(path: String, history_manager: tauri::State<'_, HistoryManager>) {
-    history_manager.remove_entry(&path);
+fn remove_from_history(
+    path: String,
+    history_manager: tauri::State<'_, HistoryManager>,
+    cache: tauri::State<'_, AppCache>,
+) {
+    let mut paths_to_remove = vec![path.clone()];
+    {
+        let items = cache.apps.lock().unwrap();
+        let path_lookup = cache.path_lookup.lock().unwrap();
+
+        let target_idx = path_lookup.get(&path).copied().or_else(|| {
+            items.iter().position(|i| i.path == path || i.alternate_paths.contains(&path))
+        });
+
+        if let Some(idx) = target_idx {
+            if let Some(item) = items.get(idx) {
+                paths_to_remove.push(item.path.clone());
+                paths_to_remove.extend(item.alternate_paths.clone());
+            }
+        }
+    }
+
+    for p in paths_to_remove {
+        history_manager.remove_entry(&p);
+    }
 }
 
 fn main() {

@@ -34,11 +34,6 @@ window.addEventListener("DOMContentLoaded", () => {
   filterTag = document.querySelector("#filter-tag");
   helpOverlay = document.querySelector("#help-overlay");
 
-  document.querySelector("#help-btn").addEventListener("click", (e) => {
-    e.stopPropagation();
-    helpOverlay.classList.toggle("hidden");
-  });
-
   // ── Debounced Search ──────────────────────────────────────────────────────
   let searchTimeout;
   let currentQueryId = 0;
@@ -95,17 +90,19 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if (e.key === "F1") {
+      e.preventDefault();
+      helpOverlay.classList.toggle("hidden");
+      return;
+    }
+
     if (e.key === "Enter" && e.altKey) {
       e.preventDefault();
       let targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
       const item = currentResults[targetIndex];
       if (item && item.path) {
-        await invoke("remove_from_history", { path: item.path });
-
-        const res = await invoke("search_items", { query: searchInput.value });
-        currentResults = sortByPriority(res).slice(0, 10);
+        await forgetItem(item.path);
         selectedIndex = Math.max(selectedIndex - 1, 0);
-        render();
       }
     } else if ((e.key === "C" || e.key === "c") && e.ctrlKey && e.shiftKey) {
       e.preventDefault();
@@ -248,13 +245,7 @@ async function launchSelected(path, e) {
   // ── Alt + Click: Remove from history ──
   if (e && e.altKey) {
     try {
-      await invoke("remove_from_history", { path });
-      // Refresh results immediately
-      const currentVal = searchInput.value;
-      const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
-      const res = await invoke("search_items", { query: fullQuery });
-      currentResults = sortByPriority(res);
-      render();
+      await forgetItem(path);
     } finally {
       releaseLock();
     }
@@ -436,12 +427,16 @@ async function revealSelected(path) {
 
 async function forgetItem(path) {
   if (!path) return;
-  await invoke("remove_from_history", { path });
-  
-  // Refresh results immediately
-  const currentVal = searchInput.value;
-  const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
-  const res = await invoke("search_items", { query: fullQuery });
-  currentResults = sortByPriority(res);
-  render();
+  try {
+    await invoke("remove_from_history", { path });
+    
+    // Refresh results immediately
+    const currentVal = searchInput.value;
+    const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
+    const res = await invoke("search_items", { query: fullQuery });
+    currentResults = sortByPriority(res).slice(0, 10);
+    render();
+  } catch (err) {
+    console.error("Error removing from history:", err);
+  }
 }

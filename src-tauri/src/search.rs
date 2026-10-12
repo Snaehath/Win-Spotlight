@@ -195,7 +195,6 @@ pub fn search_items(
             &path_lookup,
             forced_category,
             forced_item_type.as_ref(),
-            None,
             8,
         );
     }
@@ -282,13 +281,28 @@ pub fn search_items(
     }
 
     // ── 5. Stage 3: Personal Composite Ranking ──────────────────────────────
+    // Aggregate launch frequency and recency across canonical path and all alternate paths
     let mut scored_indices: Vec<ScoredIndex> = candidates
         .into_iter()
         .map(|(match_score, idx)| {
             let item = &items[idx];
-            let (count, last_ts) = history_manager.get_launch_stats(&item.path);
+            let mut count = 0u64;
+            let mut last_ts = 0u64;
+            let mut time_score = 0.0f32;
+
+            let (c, ts) = history_manager.get_launch_stats(&item.path);
+            count += c;
+            last_ts = last_ts.max(ts);
+            time_score = time_score.max(history_manager.get_time_score(&item.path));
+
+            for alt_path in &item.alternate_paths {
+                let (c, ts) = history_manager.get_launch_stats(alt_path);
+                count += c;
+                last_ts = last_ts.max(ts);
+                time_score = time_score.max(history_manager.get_time_score(alt_path));
+            }
+
             let is_app = item.category == "APP";
-            let time_score = history_manager.get_time_score(&item.path);
             let score = compute_score(match_score, count, last_ts, time_score, is_app, now);
             ScoredIndex::new(idx, score)
         })
@@ -296,45 +310,18 @@ pub fn search_items(
 
     scored_indices.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
 
-    // Materialize only the top 10 items
+    // Materialize only the top 10 items — ranked within their true semantic categories
     const TOP_K: usize = 10;
-    let ranked: Vec<SearchResult> = scored_indices
+    let mut file_results: Vec<SearchResult> = scored_indices
         .into_iter()
         .take(TOP_K)
         .map(|s| SearchResult::from(items[s.index].clone()))
         .collect();
 
-    // ── 6. Inject matching Recent items at the top ──────────────────────────
-    let recents = build_recents(
-        &history_manager,
-        &items,
-        &path_lookup,
-        forced_category,
-        forced_item_type.as_ref(),
-        Some((&matcher, query_trimmed)),
-        4,
-    );
     drop(path_lookup);
     drop(items); // release locks early
 
-    // ── 7. Merge: Recents → Ranked, deduplicated ─────────────────────────────
-    let mut final_results: Vec<SearchResult> = Vec::with_capacity(TOP_K);
-    let mut seen_paths: HashSet<String> = HashSet::with_capacity(TOP_K * 2);
-
-    for r in recents {
-        if seen_paths.insert(r.item.path.clone()) {
-            final_results.push(r);
-        }
-    }
-    for r in ranked {
-        if seen_paths.insert(r.item.path.clone()) {
-            final_results.push(r);
-        }
-    }
-
-    let mut file_results: Vec<SearchResult> = final_results.into_iter().take(TOP_K).collect();
-
-    // ── 8. Ambient Intent Layer ──────────────────────────────────────────────
+    // ── 6. Ambient Intent Layer ──────────────────────────────────────────────
     let is_command_filter = forced_category == Some("COMMAND");
     let has_other_filter = (forced_category.is_some() && !is_command_filter) || forced_item_type.is_some();
 
@@ -532,19 +519,23 @@ fn build_recents(
     path_lookup: &HashMap<String, usize>,
     forced_category: Option<&str>,
     forced_item_type: Option<&crate::indexer::ItemType>,
-    matcher: Option<(&SkimMatcherV2, &str)>,
     limit: usize,
 ) -> Vec<SearchResult> {
     let history = history_manager.load();
     let mut recents = Vec::new();
+    let mut seen_indices: HashSet<usize> = HashSet::new();
+    let mut seen_commands: HashSet<String> = HashSet::new();
 
     for record in history.records.iter() {
         if recents.len() >= limit {
             break;
         }
 
-        let item = if record.path.starts_with("COMMAND:") {
+        if record.path.starts_with("COMMAND:") {
             if forced_category.is_some() || forced_item_type.is_some() {
+                continue;
+            }
+            if !seen_commands.insert(record.path.clone()) {
                 continue;
             }
 
@@ -556,7 +547,7 @@ fn build_recents(
                 "Recent Action"
             };
 
-            Some(SearchItem {
+            recents.push(SearchResult::from(SearchItem {
                 name: format!("⚡ {}", name),
                 normalized_name: format!("⚡ {}", name).to_lowercase(),
                 acronym: String::new(),
@@ -565,35 +556,29 @@ fn build_recents(
                 item_type: crate::indexer::ItemType::File,
                 category: "RECENT".to_string(),
                 alternate_paths: Vec::new(),
-            })
+            }));
         } else {
             // O(1) index lookup via path_lookup HashMap
-            path_lookup.get(&record.path).and_then(|&idx| {
+            if let Some(&idx) = path_lookup.get(&record.path) {
+                // Deduplicate canonical item: an app never appears more than once
+                // in recents even if launched via different shortcuts or paths
+                if !seen_indices.insert(idx) {
+                    continue;
+                }
                 let cached = &items[idx];
                 if let Some(cat) = forced_category {
                     if cached.category != cat {
-                        return None;
+                        continue;
                     }
                 }
                 if let Some(itype) = forced_item_type {
                     if cached.item_type != *itype {
-                        return None;
+                        continue;
                     }
                 }
                 let mut recent_item = cached.clone();
                 recent_item.category = "RECENT".to_string();
-                Some(recent_item)
-            })
-        };
-
-        if let Some(res_item) = item {
-            let match_ok = match matcher {
-                Some((m, q)) if !q.is_empty() => m.fuzzy_match(&res_item.name, q).is_some(),
-                _ => true,
-            };
-
-            if match_ok {
-                recents.push(SearchResult::from(res_item));
+                recents.push(SearchResult::from(recent_item));
             }
         }
     }
@@ -773,6 +758,88 @@ mod tests {
         );
         let res = SearchResult::from(folder);
         assert_eq!(res.subtitle, Some("in AI-Studio".to_string()));
+    }
+
+    #[test]
+    fn test_milestone_r3_personalization_invariants() {
+        // 1. Invariant 1: build_recents deduplicates canonical items even if history
+        // has separate records for canonical and alternate representation paths.
+        let temp_dir = std::env::temp_dir().join(format!(
+            "spotlight_r3_test_{}",
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let history_file = temp_dir.join("history_v2.json");
+
+        let canonical_path = r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Discord.lnk".to_string();
+        let desktop_path = r"C:\Users\User\Desktop\Discord.lnk".to_string();
+
+        let history = crate::history::History {
+            records: vec![
+                crate::history::LaunchRecord {
+                    path: desktop_path.clone(),
+                    count: 5,
+                    last_launched: 1000,
+                    hourly_distribution: [0; 24],
+                },
+                crate::history::LaunchRecord {
+                    path: canonical_path.clone(),
+                    count: 10,
+                    last_launched: 2000,
+                    hourly_distribution: [0; 24],
+                },
+            ],
+        };
+        std::fs::write(&history_file, serde_json::to_string(&history).unwrap()).unwrap();
+        let history_manager = HistoryManager::with_path(history_file);
+
+        let mut app_item = SearchItem::new(
+            "Discord".to_string(),
+            canonical_path.clone(),
+            None,
+            crate::indexer::ItemType::App,
+            "APP".to_string(),
+        );
+        app_item.alternate_paths = vec![desktop_path.clone()];
+
+        let items = vec![app_item.clone()];
+        let mut path_lookup = HashMap::new();
+        path_lookup.insert(canonical_path.clone(), 0);
+        path_lookup.insert(desktop_path.clone(), 0);
+
+        let recents = build_recents(&history_manager, &items, &path_lookup, None, None, 8);
+        assert_eq!(recents.len(), 1, "App must appear exactly ONCE in recents despite multiple launch records for alternate paths!");
+        assert_eq!(recents[0].item.name, "Discord");
+        assert_eq!(recents[0].item.category, "RECENT");
+
+        // 2. Invariant 2: In Stage 3 personal ranking for active queries,
+        // launches under alternate paths must aggregate and boost the canonical item
+        // without altering its category to 'RECENT'.
+        let now = 2000u64;
+        let mut total_count = 0u64;
+        let mut latest_ts = 0u64;
+        let mut max_time_score = 0.0f32;
+
+        let (c, ts) = history_manager.get_launch_stats(&app_item.path);
+        total_count += c;
+        latest_ts = latest_ts.max(ts);
+        max_time_score = max_time_score.max(history_manager.get_time_score(&app_item.path));
+
+        for alt_path in &app_item.alternate_paths {
+            let (c, ts) = history_manager.get_launch_stats(alt_path);
+            total_count += c;
+            latest_ts = latest_ts.max(ts);
+            max_time_score = max_time_score.max(history_manager.get_time_score(alt_path));
+        }
+
+        assert_eq!(total_count, 15, "Launch count must aggregate across canonical and alternate paths");
+        assert_eq!(latest_ts, 2000, "Latest launch timestamp must be taken across all paths");
+
+        let boosted_score = compute_score(700, total_count, latest_ts, max_time_score, true, now);
+        let unboosted_score = compute_score(700, 0, 0, 0.0, true, now);
+        assert!(boosted_score > unboosted_score, "Aggregated history must boost composite score");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
 
