@@ -1,4 +1,5 @@
 import { escapeHtml, CATEGORY_CONFIG } from "./utils.js";
+import { iconSvg } from "./icons.js";
 
 // ui
 export function renderResults(
@@ -30,7 +31,7 @@ export function renderResults(
       // Toggle icon
       const toggle = document.createElement("div");
       toggle.className = "category-toggle";
-      toggle.innerHTML = '<i data-lucide="chevron-down"></i>';
+      toggle.innerHTML = iconSvg("chevron-down");
       header.appendChild(toggle);
 
       const titleSpan = document.createElement("span");
@@ -71,7 +72,7 @@ export function renderResults(
           : `data:image/png;base64,${item.icon}`;
         iconHTML = `<img src="${escapeHtml(iconSrc)}" class="app-icon" alt="" />`;
       } else {
-        iconHTML = `<div class="app-icon lucide-wrapper"><i data-lucide="${escapeHtml(item.icon)}"></i></div>`;
+        iconHTML = `<div class="app-icon lucide-wrapper">${iconSvg(item.icon)}</div>`;
       }
     } else {
       const isCmd =
@@ -79,7 +80,7 @@ export function renderResults(
         item.category === "WEB" ||
         item.category === "WEB SHORTCUT";
       iconHTML = `<div class="app-icon placeholder ${isCmd ? "cmd-icon" : ""}">
-                   ${isCmd ? '<i data-lucide="terminal"></i>' : ""}
+                   ${isCmd ? iconSvg("terminal") : ""}
                  </div>`;
     }
 
@@ -100,10 +101,10 @@ export function renderResults(
       </div>
       <div class="action-bar">
         <button class="action-icon reveal-btn" title="Reveal in Explorer">
-          <i data-lucide="folder-search"></i>
+          ${iconSvg("folder-search")}
         </button>
         <button class="action-icon forget-btn" title="Remove from History">
-          <i data-lucide="trash-2"></i>
+          ${iconSvg("trash-2")}
         </button>
       </div>
     `;

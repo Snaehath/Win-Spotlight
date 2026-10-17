@@ -21,18 +21,6 @@ export const CATEGORY_CONFIG = {
   "FILE":      { title: "Other Files" },
 };
 
-// Legacy support if needed, but we'll migrate to CATEGORY_CONFIG
-export const CATEGORY_TITLES = Object.fromEntries(
-  Object.entries(CATEGORY_CONFIG).map(([k, v]) => [k, v.title])
-);
-
-export const CATEGORY_PRIORITY = [
-  "RECENT", "COMMAND", "WEB SHORTCUT", "WEB",
-  "APP", "DOC", "CODE", "XLS", "PPT", "IMG", "VID", "AUDIO", "ARCHIVE",
-  "FOLDER", "DOWNLOADS", "DOCUMENTS", "PICTURES",
-  "FILE",
-];
-
 // Helper: Escape HTML to prevent XSS from raw filenames
 export function escapeHtml(unsafe) {
   if (!unsafe) return "";
@@ -42,13 +30,4 @@ export function escapeHtml(unsafe) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
-}
-
-// Helper: sort results by category priority
-export function sortByPriority(res) {
-  return res.sort((a, b) => {
-    const pA = CATEGORY_PRIORITY.indexOf(a.category);
-    const pB = CATEGORY_PRIORITY.indexOf(b.category);
-    return (pA === -1 ? 99 : pA) - (pB === -1 ? 99 : pB);
-  });
 }

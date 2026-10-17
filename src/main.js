@@ -1,4 +1,3 @@
-import { sortByPriority } from "./utils.js";
 import { showConfirm } from "./dialog.js";
 import { renderResults, updateSelection } from "./ui.js";
 
@@ -15,6 +14,27 @@ let activeFilter = null;
 let collapsedCategories = new Set();
 let helpOverlay;
 let isActivating = false;
+let currentQueryId = 0;
+
+async function refreshResults(query) {
+  const normalizedQuery = query.trim();
+  const queryId = ++currentQueryId;
+
+  // A launcher summon should present a clean input, not a history feed.
+  if (!normalizedQuery) {
+    currentResults = [];
+    selectedIndex = -1;
+    render();
+    return;
+  }
+
+  const res = await invoke("search_items", { query: normalizedQuery });
+  if (queryId !== currentQueryId) return; // Drop stale out-of-order response
+
+  currentResults = res.slice(0, 10);
+  selectedIndex = -1;
+  render();
+}
 
 const KEYWORD_MAP = {
   "app:": "Applications",
@@ -24,11 +44,6 @@ const KEYWORD_MAP = {
 };
 
 window.addEventListener("DOMContentLoaded", () => {
-  // Initialize Lucide icons
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
-
   searchInput = document.querySelector("#search-input");
   resultsList = document.querySelector("#results-list");
   filterTag = document.querySelector("#filter-tag");
@@ -36,7 +51,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // ── Debounced Search ──────────────────────────────────────────────────────
   let searchTimeout;
-  let currentQueryId = 0;
 
   searchInput.addEventListener("input", () => {
     if (currentMode === "NAMING") return; // Don't search while naming
@@ -50,7 +64,9 @@ window.addEventListener("DOMContentLoaded", () => {
       activeFilter = activeKeyword;
       filterTag.innerText = KEYWORD_MAP[activeKeyword];
       filterTag.classList.remove("hidden");
-      searchInput.value = "";
+      // Keep any text after the prefix so pasted queries (for example,
+      // "app:chrome") behave like a prefix typed before the search term.
+      searchInput.value = query.slice(activeKeyword.length);
       searchInput.placeholder = `Search ${KEYWORD_MAP[activeKeyword]}...`;
     } else if (!activeFilter) {
       activeFilter = null;
@@ -71,14 +87,8 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const queryId = ++currentQueryId;
       const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
-      const res = await invoke("search_items", { query: fullQuery });
-      if (queryId !== currentQueryId) return; // Drop stale out-of-order response
-
-      currentResults = sortByPriority(res).slice(0, 10);
-      selectedIndex = -1;
-      render();
+      await refreshResults(fullQuery);
     }, delay);
   });
 
@@ -169,11 +179,8 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ── Initial results ────────
-  invoke("search_items", { query: "" }).then((res) => {
-    currentResults = sortByPriority(res).slice(0, 10);
-    render();
-  });
+  // ── Initial empty state ───────────────────────────────────────────────────
+  refreshResults("");
 
   // ── Auto-hide on blur with debounce ──────────────────────────────────────
   let blurTimeout;
@@ -197,16 +204,13 @@ window.addEventListener("DOMContentLoaded", () => {
       activeFilter = null;
       if (filterTag) filterTag.classList.add("hidden");
       searchInput.focus();
-      invoke("search_items", { query: "" }).then((res) => {
-        currentResults = sortByPriority(res).slice(0, 10);
-        selectedIndex = -1;
-        render();
-      });
+      refreshResults("");
     });
   }
 });
 
 function render() {
+  document.querySelector(".container")?.classList.toggle("empty-state", currentResults.length === 0);
   renderResults(
     resultsList, 
     currentResults, 
@@ -217,10 +221,6 @@ function render() {
     collapsedCategories, 
     toggleCategory
   );
-  // Re-run Lucide to replace <i> with SVGs
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
 }
 
 function toggleCategory(category) {
@@ -292,10 +292,8 @@ async function launchSelected(path, e) {
       );
       if (confirmed) {
         await invoke("clear_shortcuts");
-        // Refresh recents
-        const res = await invoke("search_items", { query: "" });
-        currentResults = sortByPriority(res);
-        render();
+        // Keep the empty launcher state after changing shortcuts.
+        await refreshResults("");
       }
     } finally {
       releaseLock();
@@ -408,10 +406,8 @@ async function saveShortcutAndReset() {
       searchInput.value = "";
       pendingShortcutUrl = "";
 
-      // Refresh to show newly added shortcut if it matches empty query (recents)
-      const res = await invoke("search_items", { query: "" });
-      currentResults = sortByPriority(res);
-      render();
+      // Keep the empty launcher state after adding a shortcut.
+      await refreshResults("");
     } catch (err) {
       alert("Failed to save shortcut: " + err);
     }
@@ -433,9 +429,7 @@ async function forgetItem(path) {
     // Refresh results immediately
     const currentVal = searchInput.value;
     const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
-    const res = await invoke("search_items", { query: fullQuery });
-    currentResults = sortByPriority(res).slice(0, 10);
-    render();
+    await refreshResults(fullQuery);
   } catch (err) {
     console.error("Error removing from history:", err);
   }
