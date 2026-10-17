@@ -45,6 +45,7 @@ const KEYWORD_MAP = {
 
 window.addEventListener("DOMContentLoaded", () => {
   searchInput = document.querySelector("#search-input");
+  const container = document.querySelector(".container");
   resultsList = document.querySelector("#results-list");
   filterTag = document.querySelector("#filter-tag");
   helpOverlay = document.querySelector("#help-overlay");
@@ -53,6 +54,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let searchTimeout;
 
   searchInput.addEventListener("input", () => {
+    container?.classList.toggle("has-query", searchInput.value.trim().length > 0);
     if (currentMode === "NAMING") return; // Don't search while naming
 
     const query = searchInput.value;
@@ -90,6 +92,14 @@ window.addEventListener("DOMContentLoaded", () => {
       const fullQuery = activeFilter ? activeFilter + currentVal : currentVal;
       await refreshResults(fullQuery);
     }, delay);
+  });
+
+  document.querySelectorAll(".idle-shortcut").forEach((button) => {
+    button.addEventListener("click", () => {
+      searchInput.value = button.dataset.query || "";
+      searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+      searchInput.focus();
+    });
   });
 
   // ── Keyboard navigation ──────────────────────────────────────────────────
@@ -201,6 +211,7 @@ window.addEventListener("DOMContentLoaded", () => {
     window.__TAURI__.event.listen("window-shown", () => {
       isActivating = false; // Reset session lock for fresh launcher session
       searchInput.value = "";
+      container?.classList.remove("has-query");
       activeFilter = null;
       if (filterTag) filterTag.classList.add("hidden");
       searchInput.focus();

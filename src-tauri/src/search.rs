@@ -189,6 +189,11 @@ pub fn search_items(
 
     // ── 2. Empty query: show recents ───────────────────────────────────────
     if actual_query.is_empty() && forced_category != Some("COMMAND") {
+        // A category/type filter should not fall back to the unfiltered
+        // "Recently Used" list. Wait for a search term before returning results.
+        if forced_category.is_some() || forced_item_type.is_some() {
+            return Vec::new();
+        }
         return build_recents(
             &history_manager,
             &items,
