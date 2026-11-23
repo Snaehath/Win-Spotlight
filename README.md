@@ -14,6 +14,7 @@
 
   <p>
     <a href="https://github.com/Snaehath/Win-Spotlight/releases/latest"><strong>Download</strong></a> ·
+    <a href="https://snaehath.github.io/Win-Spotlight/">Website</a> ·
     <a href="#what-you-can-type">What you can type</a> ·
     <a href="#keyboard-shortcuts">Shortcuts</a> ·
     <a href="#privacy">Privacy</a> ·

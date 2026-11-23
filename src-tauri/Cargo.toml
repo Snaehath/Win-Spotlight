@@ -1,6 +1,6 @@
 [package]
 name = "spotlight-win"
-version = "0.5.0"
+version = "0.6.0"
 description = "Spotlight-Win"
 authors = ["you"]
 edition = "2021"
