@@ -1,163 +1,131 @@
-import { escapeHtml, CATEGORY_CONFIG } from "./utils.js";
+import {
+  CATEGORY_CONFIG,
+  ItemKind,
+  categoryTitle,
+  escapeHtml,
+  highlightMatch,
+  isCommandHint,
+  isFilesystemItem,
+  itemKind,
+} from "./utils.js";
 import { iconSvg } from "./icons.js";
 
-// ui
-export function renderResults(
-  resultsList,
-  currentResults,
-  selectedIndex,
-  onLaunch,
-  onReveal,
-  onForget,
-  collapsedCategories,
-  onToggleCategory,
-) {
-  resultsList.innerHTML = "";
-  let lastCategory = null;
+const FALLBACK_GLYPH = {
+  [ItemKind.URL]: "globe",
+  [ItemKind.SYSTEM]: "power",
+  [ItemKind.CLEAR_SHORTCUTS]: "trash-2",
+  [ItemKind.COMMAND]: "terminal",
+  [ItemKind.INFO]: "calculator",
+};
 
-  currentResults.forEach((item, index) => {
-    // ── Skip Filters ──
-    if (item.category === "FILTER") return;
-
-    // Category header
-    if (item.category !== lastCategory) {
-      const isCollapsed =
-        collapsedCategories && collapsedCategories.has(item.category);
-      const header = document.createElement("div");
-      header.className = `category-header ${isCollapsed ? "collapsed" : ""}`;
-
-      const config = CATEGORY_CONFIG[item.category] || { title: item.category };
-
-      // Toggle icon
-      const toggle = document.createElement("div");
-      toggle.className = "category-toggle";
-      toggle.innerHTML = iconSvg("chevron-down");
-      header.appendChild(toggle);
-
-      const titleSpan = document.createElement("span");
-      titleSpan.innerText = config.title;
-      header.appendChild(titleSpan);
-
-      if (config.isNew) {
-        const badge = document.createElement("span");
-        badge.className = "badge-new";
-        badge.innerText = "NEW";
-        header.appendChild(badge);
-      }
-
-      if (onToggleCategory) {
-        header.onclick = () => onToggleCategory(item.category);
-      }
-
-      resultsList.appendChild(header);
-      lastCategory = item.category;
-    }
-
-    // Skip rendering items if category is collapsed
-    if (collapsedCategories && collapsedCategories.has(item.category)) {
-      return;
-    }
-
-    const li = document.createElement("li");
-    li.className = `result-item ${index === selectedIndex ? "selected" : ""}`;
-    li.dataset.index = index;
-    li.style.setProperty("--item-index", index);
-
-    // Icon logic
-    let iconHTML = "";
-    if (item.icon) {
-      if (item.icon.startsWith("data:") || item.icon.length > 50) {
-        const iconSrc = item.icon.startsWith("data:")
-          ? item.icon
-          : `data:image/png;base64,${item.icon}`;
-        iconHTML = `<img src="${escapeHtml(iconSrc)}" class="app-icon" alt="" />`;
-      } else {
-        iconHTML = `<div class="app-icon lucide-wrapper">${iconSvg(item.icon)}</div>`;
-      }
-    } else {
-      const isCmd =
-        item.category === "COMMAND" ||
-        item.category === "WEB" ||
-        item.category === "WEB SHORTCUT";
-      iconHTML = `<div class="app-icon placeholder ${isCmd ? "cmd-icon" : ""}">
-                   ${isCmd ? iconSvg("terminal") : ""}
-                 </div>`;
-    }
-
-    // Sub-label: Priority to inline_display (math/currency), then semantic subtitle.
-    // If neither exists (standard applications), omit subLabel completely.
-    const subtitleText = item.inline_display || item.subtitle;
-    const subLabel = subtitleText
-      ? `<span class="app-path ${item.inline_display ? "inline-result" : "semantic-subtitle"}">${escapeHtml(subtitleText)}</span>`
-      : "";
-
-    li.innerHTML = `
-      ${iconHTML}
-      <div class="app-info">
-        <div class="app-header">
-          <span class="app-name">${escapeHtml(item.name)}</span>
-        </div>
-        ${subLabel}
-      </div>
-      <div class="action-bar">
-        <button class="action-icon reveal-btn" title="Reveal in Explorer">
-          ${iconSvg("folder-search")}
-        </button>
-        <button class="action-icon forget-btn" title="Remove from History">
-          ${iconSvg("trash-2")}
-        </button>
-      </div>
-    `;
-
-    // Click handlers
-    if (item.path) {
-      li.onclick = (e) => onLaunch(item.path, e);
-
-      const revealBtn = li.querySelector(".reveal-btn");
-      const forgetBtn = li.querySelector(".forget-btn");
-
-      revealBtn.onclick = (e) => {
-        e.stopPropagation();
-        onReveal(item.path);
-      };
-
-      forgetBtn.onclick = (e) => {
-        e.stopPropagation();
-        onForget(item.path);
-      };
-
-      // Hide reveal for commands
-      if (item.category === "COMMAND") {
-        revealBtn.style.display = "none";
-      }
-
-      // Hide forget if not RECENT
-      if (item.category !== "RECENT") {
-        forgetBtn.style.display = "none";
-      }
-    } else {
-      const actionBar = li.querySelector(".action-bar");
-      if (actionBar) {
-        actionBar.style.display = "none";
-      }
-    }
-
-    resultsList.appendChild(li);
-
-    if (index === selectedIndex) {
-      li.scrollIntoView({ block: "nearest" });
-    }
-  });
+function renderIcon(item, kind) {
+  const icon = item.icon;
+  if (icon && (icon.startsWith("data:") || icon.length > 50)) {
+    const src = icon.startsWith("data:") ? icon : `data:image/png;base64,${icon}`;
+    return `<img src="${escapeHtml(src)}" class="app-icon" alt="" draggable="false" />`;
+  }
+  const glyph = icon || FALLBACK_GLYPH[kind] || "terminal";
+  const tone = kind === ItemKind.INFO && !isCommandHint(item) ? " accent" : "";
+  return `<div class="app-icon glyph${tone}">${iconSvg(glyph)}</div>`;
 }
 
-export function updateSelection(resultsList, selectedIndex) {
-  const items = resultsList.querySelectorAll(".result-item");
-  items.forEach((li) => {
-    if (parseInt(li.dataset.index) === selectedIndex) {
-      li.classList.add("selected");
-      li.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    } else {
-      li.classList.remove("selected");
+/**
+ * Inline results ("45 * 12 = 540", "100 USD = 92.13 EUR") read better with the
+ * answer as the title and the question as the subtitle.
+ */
+function describe(item, kind, term) {
+  const inline = item.inline_display;
+  if (inline) {
+    const eq = inline.lastIndexOf(" = ");
+    const action = kind === ItemKind.INFO ? "Enter to copy" : "Enter to search the web";
+    if (eq >= 0) {
+      return {
+        title: escapeHtml(inline.slice(eq + 3)),
+        subtitle: `${inline.slice(0, eq)}  ·  ${action}`,
+      };
     }
+    return { title: escapeHtml(inline), subtitle: action };
+  }
+
+  if (isCommandHint(item)) {
+    const [prefix, ...rest] = item.name.split("—");
+    return { title: escapeHtml(prefix.trim()), subtitle: rest.join("—").trim() };
+  }
+
+  return { title: highlightMatch(item.name, term), subtitle: item.subtitle || "" };
+}
+
+function renderActions(item, kind) {
+  const buttons = [];
+  if (isFilesystemItem(item)) {
+    buttons.push(["reveal", "folder-search", "Reveal in Explorer (Shift+Enter)"]);
+    buttons.push(["copy", "copy", "Copy path (Ctrl+Shift+C)"]);
+  } else if (kind === ItemKind.URL) {
+    if (item.category === "WEB") {
+      buttons.push(["save-shortcut", "bookmark-plus", "Save as shortcut (Ctrl+Enter)"]);
+    }
+    buttons.push(["copy", "copy", "Copy URL (Ctrl+Shift+C)"]);
+  } else if (kind === ItemKind.INFO && !isCommandHint(item)) {
+    buttons.push(["copy", "copy", "Copy (Enter)"]);
+  }
+
+  if (!buttons.length) return "";
+  return `<div class="row-actions">${buttons
+    .map(
+      ([action, icon, label]) =>
+        `<button class="row-action" type="button" tabindex="-1" data-action="${action}" title="${label}" aria-label="${label}">${iconSvg(icon)}</button>`,
+    )
+    .join("")}</div>`;
+}
+
+export function renderResults(list, results, selectedIndex, term) {
+  let html = "";
+  let lastCategory = null;
+
+  results.forEach((item, index) => {
+    if (item.category !== lastCategory) {
+      lastCategory = item.category;
+      html += `<li class="category-header" role="presentation">${escapeHtml(categoryTitle(item.category))}</li>`;
+    }
+
+    const kind = itemKind(item);
+    const { title, subtitle } = describe(item, kind, term);
+    const actions = renderActions(item, kind);
+    const label = CATEGORY_CONFIG[item.category]?.label ?? "";
+    const classes = ["result-item"];
+    if (index === selectedIndex) classes.push("selected");
+    if (item.inline_display) classes.push("inline-result");
+    if (actions) classes.push("has-actions");
+
+    html += `
+      <li id="result-${index}" class="${classes.join(" ")}" role="option" aria-selected="${index === selectedIndex}" data-index="${index}">
+        ${renderIcon(item, kind)}
+        <div class="app-info">
+          <span class="app-name">${title}</span>
+          ${subtitle ? `<span class="app-subtitle">${escapeHtml(subtitle)}</span>` : ""}
+        </div>
+        ${label && !item.inline_display ? `<span class="row-hint">${escapeHtml(label)}</span>` : ""}
+        ${actions}
+      </li>`;
   });
+
+  list.innerHTML = html;
+  list.scrollTop = 0;
+}
+
+export function updateSelection(list, selectedIndex, { scroll = true } = {}) {
+  const previous = list.querySelector(".result-item.selected");
+  previous?.classList.remove("selected");
+  previous?.setAttribute("aria-selected", "false");
+
+  const row = list.querySelector(`.result-item[data-index="${selectedIndex}"]`);
+  if (!row) return;
+  row.classList.add("selected");
+  row.setAttribute("aria-selected", "true");
+  if (!scroll) return;
+
+  // On the first row of a group, bring its section header into view too.
+  const header = row.previousElementSibling;
+  if (header?.classList.contains("category-header")) header.scrollIntoView({ block: "nearest" });
+  row.scrollIntoView({ block: "nearest" });
 }

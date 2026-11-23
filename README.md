@@ -25,10 +25,12 @@
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Move through results |
 | <kbd>Shift</kbd> + <kbd>Enter</kbd> | Reveal a file in Explorer |
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> | Copy the selected path |
-| <kbd>Alt</kbd> + <kbd>Enter</kbd> | Remove an item from recent history |
-| <kbd>Esc</kbd> | Hide the launcher |
+| <kbd>Ctrl</kbd> + <kbd>Enter</kbd> | Save a typed URL as a named web shortcut |
+| <kbd>Alt</kbd> + <kbd>Enter</kbd> | Forget an item's launch history |
+| <kbd>F1</kbd> | Show all shortcuts and commands |
+| <kbd>Esc</kbd> | Hide the launcher (or cancel naming a shortcut) |
 
-Filters include `app:`, `folder:`, `file:`, and `command:`. Type a URL to open it in your browser. Type `> sys` to see system actions.
+Filters include `app:`, `folder:`, `file:`, and `command:`. Type a URL to open it in your browser. Type `> sys` to see system actions. Pressing <kbd>Enter</kbd> on a calculation copies its result.
 
 ## Install
 

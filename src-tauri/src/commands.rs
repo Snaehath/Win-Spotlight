@@ -294,10 +294,13 @@ impl CommandPlugin for WebSearchPlugin {
         if args.is_empty() {
             return CommandResult::Error("Usage: > g <search terms>".to_string());
         }
-        let encoded = args.replace(' ', "+");
-        let url = format!("https://www.google.com/search?q={}", encoded);
-        // Safely launch URL via explorer/powershell instead of cmd.exe
-        CommandResult::Launch("https".to_string(), vec![url]) // Tagged as https to help launcher.rs identify it
+        // Properly percent-encode the query ("c++ & rust" must survive intact).
+        let url = match reqwest::Url::parse_with_params("https://www.google.com/search", &[("q", args)]) {
+            Ok(url) => url.to_string(),
+            Err(e) => return CommandResult::Error(e.to_string()),
+        };
+        // Tagged as "https" so execute_command_result opens it via ShellExecuteW.
+        CommandResult::Launch("https".to_string(), vec![url])
     }
 }
 
@@ -343,6 +346,22 @@ pub fn execute_command_result(result: CommandResult) -> Result<Option<String>, S
                     .map_err(|e| e.to_string())?;
             }
             Ok(None)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn web_search_percent_encodes_query() {
+        match WebSearchPlugin.execute("c++ & rust?") {
+            CommandResult::Launch(tag, args) => {
+                assert_eq!(tag, "https");
+                assert_eq!(args[0], "https://www.google.com/search?q=c%2B%2B+%26+rust%3F");
+            }
+            other => panic!("unexpected result: {:?}", other),
         }
     }
 }

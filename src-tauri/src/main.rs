@@ -55,13 +55,15 @@ fn show_error_and_exit(title: &str, message: &str) -> ! {
 // tauri commands
 #[tauri::command]
 fn toggle_window(app_handle: AppHandle) {
+    // Window ops can fail transiently (e.g. during display changes). With
+    // `panic = "abort"` in release an unwrap here would kill the launcher.
     if let Some(window) = app_handle.get_webview_window("main") {
         if window.is_visible().unwrap_or(false) {
-            window.hide().unwrap();
+            let _ = window.hide();
         } else {
-            window.show().unwrap();
-            window.set_focus().unwrap();
             let _ = window.emit("window-shown", ());
+            let _ = window.show();
+            let _ = window.set_focus();
         }
     }
 }
@@ -69,7 +71,7 @@ fn toggle_window(app_handle: AppHandle) {
 #[tauri::command]
 fn hide_window(app_handle: AppHandle) {
     if let Some(window) = app_handle.get_webview_window("main") {
-        window.hide().unwrap();
+        let _ = window.hide();
     }
 }
 
@@ -214,14 +216,18 @@ fn main() {
             // ── System Tray ──────────────────────────────────────────────────
             let show_i = MenuItem::with_id(app, "show", "Show Spotlight", true, None::<&str>)?;
             let pause_i = MenuItem::with_id(app, "pause", "Pause Global Shortcut", true, None::<&str>)?;
-            let about_1 = MenuItem::with_id(app, "about", "About Spotlight", true, None::<&str>)?;
-            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &pause_i, &about_1, &quit_i])?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit Spotlight", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &pause_i, &quit_i])?;
+            let pause_item = pause_i.clone();
 
-            let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
-                .menu(&menu)
-                .on_menu_event(|app, event| {
+            let mut tray = TrayIconBuilder::new()
+                .tooltip(concat!("Spotlight ", env!("CARGO_PKG_VERSION"), " — Ctrl+Space"))
+                .menu(&menu);
+            if let Some(icon) = app.default_window_icon() {
+                tray = tray.icon(icon.clone());
+            }
+            let _tray = tray
+                .on_menu_event(move |app, event| {
                     match event.id.as_ref() {
                         "show" => {
                             toggle_window(app.clone());
@@ -231,21 +237,12 @@ fn main() {
                             let mut enabled = state.0.lock().unwrap();
                             *enabled = !*enabled;
                             
-                            let new_text = if *enabled { "Pause Global Shortcut" } else { "▶ Resume Global Shortcut" };
-                            
-                            if let Some(menu) = app.menu() {
-                                if let Some(item_kind) = menu.get("pause") {
-                                    if let Some(menu_item) = item_kind.as_menuitem() {
-                                        let _ = menu_item.set_text(new_text);
-                                    }
-                                }
-                            }
+                            let new_text = if *enabled { "Pause Global Shortcut" } else { "Resume Global Shortcut" };
+                            // The item lives in the tray menu, not `app.menu()`.
+                            let _ = pause_item.set_text(new_text);
                         }
                         "quit" => {
                             app.exit(0);
-                        }
-                        "about" => {
-                            // Silent about
                         }
                         _ => {}
                     }
@@ -259,7 +256,6 @@ fn main() {
 
             Ok(())
         })
-        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,

@@ -1,59 +1,78 @@
-// ── Dialog Management ────────────────────────────────────────────────────────
-export async function showConfirm(title, message, searchInput, options = {}) {
+// ── Confirm dialog ──────────────────────────────────────────────────────────
+// A single in-panel modal. While open it owns the keyboard (capture phase) so
+// Enter/Escape never leak to the launcher underneath.
+
+let activeResolve = null;
+
+export function isDialogOpen() {
+  return activeResolve !== null;
+}
+
+/** Resolve any open dialog as "cancelled" (e.g. when the window is re-summoned). */
+export function cancelDialog() {
+  activeResolve?.(false);
+}
+
+/**
+ * @param {string} title
+ * @param {string} message
+ * @param {{ okText?: string, cancelText?: string, danger?: boolean, returnFocus?: HTMLElement }} [options]
+ * @returns {Promise<boolean>}
+ */
+export function showConfirm(title, message, options = {}) {
+  cancelDialog();
+
   const overlay = document.getElementById("confirm-dialog");
-  const titleEl = document.getElementById("dialog-title");
-  const msgEl = document.getElementById("dialog-message");
   const btnOk = document.getElementById("dialog-ok");
   const btnCancel = document.getElementById("dialog-cancel");
+  const container = overlay.closest(".container");
 
-  const origOkText = btnOk.innerText;
-  const origCancelText = btnCancel.innerText;
-
-  if (options.okText) btnOk.innerText = options.okText;
-  if (options.cancelText) btnCancel.innerText = options.cancelText;
-
-  titleEl.innerText = title;
-  msgEl.innerText = message;
+  document.getElementById("dialog-title").textContent = title;
+  document.getElementById("dialog-message").textContent = message;
+  btnOk.textContent = options.okText || "Confirm";
+  btnCancel.textContent = options.cancelText || "Cancel";
+  overlay.classList.toggle("danger", Boolean(options.danger));
   overlay.classList.remove("hidden");
+  container?.classList.add("overlay-open");
+  btnOk.focus();
 
   return new Promise((resolve) => {
-    let handleKey;
-
-    const cleanup = () => {
-      btnOk.removeEventListener("click", handleOk);
-      btnCancel.removeEventListener("click", handleCancel);
-      if (handleKey) {
-        window.removeEventListener("keydown", handleKey);
+    const onKey = (e) => {
+      e.stopImmediatePropagation();
+      if (e.repeat) {
+        e.preventDefault();
+        return;
       }
-      btnOk.innerText = origOkText;
-      btnCancel.innerText = origCancelText;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        finish(false);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        finish(document.activeElement !== btnCancel);
+      } else if (e.key === "Tab" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        (document.activeElement === btnOk ? btnCancel : btnOk).focus();
+      }
+    };
+    const onOk = () => finish(true);
+    const onCancel = () => finish(false);
+
+    function finish(result) {
+      window.removeEventListener("keydown", onKey, true);
+      btnOk.removeEventListener("click", onOk);
+      btnCancel.removeEventListener("click", onCancel);
       overlay.classList.add("hidden");
-      // refocus search
-      if (searchInput) searchInput.focus();
-    };
-
-    const handleOk = () => {
-      cleanup();
-      resolve(true);
-    };
-
-    const handleCancel = () => {
-      cleanup();
-      resolve(false);
-    };
-
-    btnOk.addEventListener("click", handleOk, { once: true });
-    btnCancel.addEventListener("click", handleCancel, { once: true });
-    
-    handleKey = (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        handleOk();
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        handleCancel();
+      if (!document.querySelector(".overlay:not(.hidden)")) {
+        container?.classList.remove("overlay-open");
       }
-    };
-    window.addEventListener("keydown", handleKey);
+      activeResolve = null;
+      options.returnFocus?.focus();
+      resolve(result);
+    }
+
+    activeResolve = finish;
+    window.addEventListener("keydown", onKey, true);
+    btnOk.addEventListener("click", onOk);
+    btnCancel.addEventListener("click", onCancel);
   });
 }

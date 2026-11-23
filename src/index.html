@@ -2,110 +2,117 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
     <title>Spotlight</title>
+    <link rel="stylesheet" href="styles.css" />
   </head>
 
   <body>
-    <div class="container">
-      <!-- search section -->
+    <main class="container empty-state" id="container">
+      <!-- Search -->
       <div class="search-box">
-        <div class="search-input-wrapper">
-          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-          <div id="filter-tag" class="filter-tag hidden"></div>
-            <input
-              id="search-input"
-              type="text"
-              placeholder="Search..."
-              autofocus
-              autocomplete="off"
-            />
-          <div class="idle-shortcuts" role="group" aria-label="Search shortcuts">
-            <button class="idle-shortcut" type="button" data-query="app:" aria-label="Search applications" title="Applications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1"/><rect x="7" y="7" width="10" height="10" rx="2"/></svg></button>
-            <button class="idle-shortcut" type="button" data-query="folder:" aria-label="Search folders" title="Folders"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
-            <button class="idle-shortcut" type="button" data-query="file:" aria-label="Search files" title="Files"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg></button>
-            <button class="idle-shortcut" type="button" data-query="command:" aria-label="Search commands" title="Commands"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 9 3 3-3 3m5 0h3"/></svg></button>
-          </div>
+        <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <button id="filter-tag" class="filter-tag hidden" type="button" title="Remove filter (Backspace)"></button>
+        <input
+          id="search-input"
+          type="text"
+          placeholder="Search apps, files, and commands"
+          autofocus
+          autocomplete="off"
+          spellcheck="false"
+          role="combobox"
+          aria-label="Search"
+          aria-expanded="false"
+          aria-controls="results-list"
+          aria-autocomplete="list"
+        />
+        <div class="idle-shortcuts" role="group" aria-label="Search filters">
+          <button class="idle-shortcut" type="button" data-query="app:" aria-label="Search applications" title="Applications  (app:)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
+          <button class="idle-shortcut" type="button" data-query="folder:" aria-label="Search folders" title="Folders  (folder:)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
+          <button class="idle-shortcut" type="button" data-query="file:" aria-label="Search files" title="Files  (file:)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></button>
+          <button class="idle-shortcut" type="button" data-query="command:" aria-label="Search commands" title="Commands  (command:)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3m5 0h5"/></svg></button>
         </div>
       </div>
 
-      <!-- results section -->
-      <ul id="results-list" class="results"></ul>
-
-      <!-- footer section -->
-      <div id="command-footer" class="command-footer">
-        <div class="footer-item">
-          <svg class="footer-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M5 3.5v9" />
-            <path d="M2.5 10L5 12.5l2.5-2.5" />
-            <path d="M11 12.5v-9" />
-            <path d="M8.5 6L11 3.5l2.5 2.5" />
-          </svg>
-          <span>to navigate</span>
-        </div>
-        <div class="footer-item">
-          <svg class="footer-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M13 4v5a2 2 0 0 1-2 2H3" />
-            <path d="M6 8L3 11l3 3" />
-          </svg>
-          <span>to select</span>
-        </div>
+      <!-- Results -->
+      <ul id="results-list" class="results" role="listbox" aria-label="Results"></ul>
+      <div id="notice" class="notice hidden" role="status" aria-live="polite">
+        <p id="notice-title" class="notice-title"></p>
+        <p id="notice-text" class="notice-text"></p>
       </div>
 
-      <!-- dialogs and overlays -->
-      <div id="confirm-dialog" class="dialog-overlay hidden">
+      <!-- Footer -->
+      <footer class="command-footer">
+        <span id="footer-action" class="footer-action"></span>
+        <span id="toast" class="toast" role="status" aria-live="polite"></span>
+        <div class="footer-keys">
+          <span class="footer-item" id="footer-nav"><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
+          <span class="footer-item" id="footer-enter-item"><kbd>↵</kbd> <span id="footer-enter">Open</span></span>
+          <span class="footer-item"><kbd>F1</kbd> Help</span>
+        </div>
+      </footer>
+
+      <!-- Confirm dialog -->
+      <div id="confirm-dialog" class="overlay dialog-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby="dialog-message">
         <div class="dialog-box">
-          <div class="dialog-icon">⚠️</div>
-          <h3 id="dialog-title">Confirmation</h3>
-          <p id="dialog-message">Are you sure you want to proceed?</p>
+          <div class="dialog-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          </div>
+          <h3 id="dialog-title"></h3>
+          <p id="dialog-message"></p>
           <div class="dialog-actions">
-            <button id="dialog-cancel" class="btn-secondary">Cancel</button>
-            <button id="dialog-ok" class="btn-primary">Proceed</button>
+            <button id="dialog-cancel" class="btn btn-secondary" type="button">Cancel</button>
+            <button id="dialog-ok" class="btn btn-primary" type="button">Confirm</button>
           </div>
         </div>
       </div>
 
-      <!-- Help Overlay (The Manual) -->
-      <div id="help-overlay" class="help-overlay hidden">
+      <!-- Help overlay -->
+      <div id="help-overlay" class="overlay help-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="help-title">
         <div class="help-content">
           <div class="help-header">
-            <h3>Helper Manual</h3>
-            <span class="close-hint">Press <kbd>Esc</kbd> to close</span>
+            <h3 id="help-title">Keyboard &amp; commands</h3>
+            <span class="close-hint"><kbd>Esc</kbd> to close</span>
           </div>
-          
+
           <div class="help-grid">
-            <div class="help-section">
+            <section class="help-section">
               <h4>Navigation</h4>
-              <div class="help-row"><span>Move Selection</span> <div class="keys"><kbd>↑</kbd><kbd>↓</kbd></div></div>
-              <div class="help-row"><span>Open / Launch</span> <kbd>Enter</kbd></div>
-              <div class="help-row"><span>Hide Window</span> <kbd>Esc</kbd></div>
-            </div>
+              <div class="help-row"><span>Move selection</span><span class="keys"><kbd>↑</kbd><kbd>↓</kbd></span></div>
+              <div class="help-row"><span>Open / run</span><span class="keys"><kbd>Enter</kbd></span></div>
+              <div class="help-row"><span>Hide window</span><span class="keys"><kbd>Esc</kbd></span></div>
+              <div class="help-row"><span>Toggle launcher</span><span class="keys"><kbd>Ctrl</kbd><kbd>Space</kbd></span></div>
+            </section>
 
-            <div class="help-section">
-              <h4>Item Actions</h4>
-              <div class="help-row"><span>Reveal in Folder</span> <kbd>Shift</kbd> + <kbd>Enter</kbd></div>
-              <div class="help-row"><span>Forget Item</span> <kbd>Alt</kbd> + <kbd>Enter</kbd></div>
-            </div>
+            <section class="help-section">
+              <h4>Item actions</h4>
+              <div class="help-row"><span>Reveal in Explorer</span><span class="keys"><kbd>Shift</kbd><kbd>Enter</kbd></span></div>
+              <div class="help-row"><span>Copy path</span><span class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>C</kbd></span></div>
+              <div class="help-row"><span>Save URL as shortcut</span><span class="keys"><kbd>Ctrl</kbd><kbd>Enter</kbd></span></div>
+              <div class="help-row"><span>Forget from history</span><span class="keys"><kbd>Alt</kbd><kbd>Enter</kbd></span></div>
+            </section>
 
-            <div class="help-section">
-              <h4>Search Filters</h4>
-              <div class="help-row"><span>Apps Only</span> <kbd>app:</kbd></div>
-              <div class="help-row"><span>Files Only</span> <kbd>file:</kbd></div>
-              <div class="help-row"><span>Folders Only</span> <kbd>folder:</kbd></div>
-            </div>
+            <section class="help-section">
+              <h4>Filters</h4>
+              <div class="help-row"><span>Applications</span><span class="keys"><kbd>app:</kbd></span></div>
+              <div class="help-row"><span>Files</span><span class="keys"><kbd>file:</kbd></span></div>
+              <div class="help-row"><span>Folders</span><span class="keys"><kbd>folder:</kbd></span></div>
+              <div class="help-row"><span>Commands</span><span class="keys"><kbd>command:</kbd></span></div>
+            </section>
 
-            <div class="help-section">
-              <h4>Advanced</h4>
-              <div class="help-row"><span>Help Manual</span> <kbd>F1</kbd> / <kbd>/help</kbd></div>
-              <div class="help-row"><span>System Actions</span> <kbd>> sys</kbd></div>
-              <div class="help-row"><span>Web Shortcut</span> <kbd>CREATE_SHORTCUT:</kbd></div>
-            </div>
+            <section class="help-section">
+              <h4>Commands</h4>
+              <div class="help-row"><span>Calculate</span><span class="keys"><kbd>12*(3+4)</kbd></span></div>
+              <div class="help-row"><span>Convert currency</span><span class="keys"><kbd>100 usd to eur</kbd></span></div>
+              <div class="help-row"><span>Web search</span><span class="keys"><kbd>&gt; g query</kbd></span></div>
+              <div class="help-row"><span>System stats</span><span class="keys"><kbd>system</kbd></span></div>
+            </section>
           </div>
         </div>
       </div>
-    </div>
+    </main>
 
-    <script type="module" src="/main.js"></script>
+    <script type="module" src="main.js"></script>
   </body>
 </html>

@@ -412,7 +412,10 @@ fn detect_ambient_intent(
         let is_match = if force_all && is_empty { 
             true 
         } else { 
-            alias.starts_with(&q) || q.starts_with(&alias) || matcher.fuzzy_match(&alias, &q).is_some()
+            // Prefix match, or fuzzy once the user has typed enough to mean it.
+            // (Previously `q.starts_with(alias)` made a 1-letter alias match
+            // every query starting with that letter and pin itself above apps.)
+            alias.starts_with(&q) || (q.len() >= 2 && matcher.fuzzy_match(&alias, &q).is_some())
         };
         
         if is_match {
