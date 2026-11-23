@@ -1,1226 +1,867 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Spotlight-Win — Elite Insight Engine for Windows</title>
-  <meta name="description" content="A high-fidelity, privacy-first search utility for Windows power users. Zero Ads. Zero Bing. Built in Rust for ultimate speed." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.383.0/dist/umd/lucide.min.js"></script>
+  <title>Spotlight-Win — A fast, keyboard-first launcher for Windows</title>
+  <meta name="description" content="Press Ctrl+Space, type a few letters, press Enter. Spotlight-Win finds apps, files and folders, does maths and currency conversions, and runs system actions. Native, fast and private." />
+  <meta name="theme-color" content="#2f6fe4" />
+  <meta property="og:title" content="Spotlight-Win — A fast, keyboard-first launcher for Windows" />
+  <meta property="og:description" content="Find apps, files and folders, calculate, convert currencies and run system actions with Ctrl+Space. Native, fast and private." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="public/app_icon.png" />
+  <link rel="icon" type="image/png" href="public/app_icon.png" />
 
   <style>
-    /* ─── TOKENS ─────────────────────────────────────────────── */
+    /* ── Tokens ─────────────────────────────────────────────────────────── */
     :root {
-      --ink:        #09090b;
-      --ink-2:      #111117;
-      --ink-3:      #1a1a24;
-      --surface:    #16161f;
-      --border:     rgba(255,255,255,0.07);
-      --border-hi:  rgba(255,255,255,0.14);
-      --amber:      #f59e0b;
-      --amber-dim:  rgba(245,158,11,0.15);
-      --amber-glow: rgba(245,158,11,0.35);
-      --cyan:       #22d3ee;
-      --cyan-dim:   rgba(34,211,238,0.12);
-      --cyan-glow:  rgba(34,211,238,0.3);
-      --text:       #f4f4f5;
-      --text-2:     #a1a1aa;
-      --text-3:     #52525b;
-      --mono:       'Space Mono', monospace;
-      --display:    'Syne', sans-serif;
-      --body:       'DM Sans', sans-serif;
-      --r:          8px;
-    }
+      --bg: #f6f8fc;
+      --bg-alt: #edf1f8;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --text-2: #475569;
+      --text-3: #7b879b;
+      --border: rgba(15, 23, 42, 0.09);
+      --accent: #2f6fe4;
+      --accent-strong: #1f5fd6;
+      --accent-soft: rgba(47, 111, 228, 0.1);
+      --ok: #16a34a;
 
-    /* ─── RESET ──────────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: var(--body);
-      background: var(--ink);
+      --glass: rgba(236, 242, 250, 0.86);
+      --glass-edge: rgba(255, 255, 255, 0.8);
+      --glass-shadow: 0 30px 60px -20px rgba(15, 30, 70, 0.45), 0 2px 6px rgba(15, 30, 70, 0.12);
+
+      --radius: 18px;
+      --max: 1120px;
+      --ease: cubic-bezier(0.2, 0, 0, 1);
+
+      color-scheme: light;
+      font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
       color: var(--text);
-      line-height: 1.7;
-      overflow-x: hidden;
+      background: var(--bg);
       -webkit-font-smoothing: antialiased;
     }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b0e15;
+        --bg-alt: #10141d;
+        --surface: #151a24;
+        --text: #eef1f7;
+        --text-2: #a3acbd;
+        --text-3: #747e91;
+        --border: rgba(255, 255, 255, 0.08);
+        --accent: #5b93ff;
+        --accent-strong: #3a7af5;
+        --accent-soft: rgba(91, 147, 255, 0.14);
+        --ok: #4ade80;
+
+        --glass: rgba(34, 37, 46, 0.88);
+        --glass-edge: rgba(255, 255, 255, 0.13);
+        --glass-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.4);
+
+        color-scheme: dark;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+    body { margin: 0; background: var(--bg); }
+    img { max-width: 100%; display: block; }
     a { color: inherit; text-decoration: none; }
-    img { display: block; max-width: 100%; }
+    svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
 
-    /* ─── NOISE OVERLAY ──────────────────────────────────────── */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-      opacity: 0.025;
-      pointer-events: none;
-      z-index: 9999;
-    }
+    .wrap { width: 100%; max-width: var(--max); margin: 0 auto; padding: 0 24px; }
 
-    /* ─── GRID BG ─────────────────────────────────────────────── */
-    .grid-bg {
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
-      background-size: 60px 60px;
-      pointer-events: none;
-      z-index: 0;
+    kbd {
+      display: inline-block;
+      min-width: 26px;
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--text);
+      font: 600 13px/1.5 inherit;
+      font-family: inherit;
+      text-align: center;
+      white-space: nowrap;
     }
 
-    /* ─── LAYOUT ─────────────────────────────────────────────── */
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 2rem;
+    code {
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font: 500 0.88em/1.5 "Cascadia Code", Consolas, ui-monospace, monospace;
+      white-space: nowrap;
     }
 
-    /* ─── ANIMATIONS ─────────────────────────────────────────── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(28px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-    }
-    @keyframes scanline {
-      0%   { top: -4px; }
-      100% { top: 100%; }
-    }
-    @keyframes blink {
-      0%,100% { opacity: 1; }
-      50%      { opacity: 0; }
-    }
-    @keyframes shimmer {
-      0%   { background-position: -200% center; }
-      100% { background-position: 200% center; }
-    }
-    @keyframes glow-pulse {
-      0%,100% { opacity: 0.6; }
-      50%      { opacity: 1; }
-    }
-    @keyframes spin-slow {
-      from { transform: rotate(0deg); }
-      to   { transform: rotate(360deg); }
-    }
-    @keyframes float {
-      0%,100% { transform: translateY(0px); }
-      50%      { transform: translateY(-8px); }
-    }
-    @keyframes dash {
-      to { stroke-dashoffset: 0; }
-    }
-
-    .reveal {
-      opacity: 0;
-      transform: translateY(24px);
-      transition: opacity 0.7s cubic-bezier(.2,.8,.2,1), transform 0.7s cubic-bezier(.2,.8,.2,1);
-    }
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    .d1 { transition-delay: 0.1s; }
-    .d2 { transition-delay: 0.2s; }
-    .d3 { transition-delay: 0.3s; }
-    .d4 { transition-delay: 0.4s; }
-    .d5 { transition-delay: 0.5s; }
-
-    /* ─── NAV ────────────────────────────────────────────────── */
-    nav {
-      position: fixed;
-      top: 0;
-      width: 100%;
-      z-index: 200;
-      padding: 0;
-      transition: background 0.4s, border-color 0.4s;
-    }
-    nav.scrolled {
-      background: rgba(9,9,11,0.88);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border-bottom: 1px solid var(--border);
-    }
-    .nav-inner {
-      display: flex;
+    /* ── Buttons ────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
       align-items: center;
-      justify-content: space-between;
-      height: 64px;
+      gap: 10px;
+      height: 48px;
+      padding: 0 22px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 15px;
+      transition: transform 140ms var(--ease), background-color 140ms var(--ease), box-shadow 140ms var(--ease);
     }
-    .logo {
+    .btn svg { width: 18px; height: 18px; }
+    .btn-primary {
+      background: var(--accent-strong);
+      color: #fff;
+      box-shadow: 0 8px 20px -8px rgba(31, 95, 214, 0.7);
+    }
+    .btn-primary:hover { background: var(--accent); transform: translateY(-1px); }
+    .btn-ghost { border: 1px solid var(--border); background: var(--surface); }
+    .btn-ghost:hover { border-color: var(--text-3); transform: translateY(-1px); }
+    .btn-meta { font-weight: 400; opacity: 0.8; font-size: 13px; }
+
+    /* ── Nav ────────────────────────────────────────────────────────────── */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: color-mix(in srgb, var(--bg) 82%, transparent);
+      backdrop-filter: saturate(1.6) blur(14px);
+      -webkit-backdrop-filter: saturate(1.6) blur(14px);
+      border-bottom: 1px solid transparent;
+      transition: border-color 200ms var(--ease);
+    }
+    .nav.scrolled { border-bottom-color: var(--border); }
+    .nav-inner { display: flex; align-items: center; gap: 32px; height: 64px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+    .brand img { width: 30px; height: 30px; border-radius: 8px; }
+    .nav-links { display: flex; gap: 26px; margin-left: auto; font-size: 14.5px; color: var(--text-2); }
+    .nav-links a:hover { color: var(--text); }
+    .nav .btn { height: 38px; padding: 0 16px; font-size: 14px; }
+
+    /* ── Hero ───────────────────────────────────────────────────────────── */
+    .hero { padding: 72px 0 40px; text-align: center; }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--text-2);
+      font-size: 13.5px;
+    }
+    .eyebrow b { color: var(--accent); font-weight: 600; }
+    h1 {
+      margin: 22px auto 0;
+      max-width: 820px;
+      font-size: clamp(40px, 6.4vw, 72px);
+      line-height: 1.04;
+      letter-spacing: -0.035em;
+      font-weight: 700;
+    }
+    h1 .grad {
+      background: linear-gradient(100deg, var(--accent) 10%, #8b5cf6 90%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .lede { margin: 22px auto 0; max-width: 620px; font-size: 19px; color: var(--text-2); }
+    .lede kbd { font-size: 14px; }
+    .cta-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 34px; }
+    .fineprint { margin-top: 14px; font-size: 13.5px; color: var(--text-3); }
+
+    /* ── Demo ───────────────────────────────────────────────────────────── */
+    .demo-stage {
+      position: relative;
+      margin: 56px auto 0;
+      max-width: 980px;
+      padding: 56px 24px 64px;
+      border-radius: 28px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 18% 22%, rgba(255, 196, 120, 0.85) 0, transparent 34%),
+        radial-gradient(circle at 85% 78%, rgba(46, 160, 110, 0.75) 0, transparent 38%),
+        radial-gradient(circle at 70% 10%, rgba(170, 120, 255, 0.55) 0, transparent 30%),
+        linear-gradient(155deg, #4b9be0 0%, #2459a5 55%, #3b2d63 100%);
+      box-shadow: 0 40px 80px -40px rgba(20, 40, 90, 0.55);
+      isolation: isolate;
+    }
+    .launcher {
+      position: relative;
+      max-width: 680px;
+      margin: 0 auto;
+      text-align: left;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .l-row { display: flex; align-items: center; gap: 10px; }
+    .l-search {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-family: var(--mono);
-      font-weight: 700;
-      font-size: 1rem;
-      letter-spacing: -0.02em;
-      transition: opacity 0.2s;
+      flex: 1;
+      height: 54px;
+      padding: 0 22px 0 20px;
+      border: 1px solid var(--glass-edge);
+      border-radius: 27px;
+      background: var(--glass);
+      box-shadow: var(--glass-shadow);
+      transition: border-radius 180ms var(--ease);
     }
-    .logo:hover { opacity: 0.75; }
-    .logo-mark {
-      position: relative;
-      width: 32px;
-      height: 32px;
+    .l-search svg { width: 20px; height: 20px; flex: none; color: var(--text-2); }
+    .l-query { font-size: 21px; white-space: nowrap; overflow: hidden; }
+    .l-query.placeholder { color: var(--text-3); }
+    .l-caret { width: 2px; height: 24px; margin-left: -8px; background: var(--accent); animation: blink 1s steps(1) infinite; }
+    .l-chip {
+      flex: none;
+      padding: 3px 11px;
+      border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+    .l-circles { display: flex; gap: 10px; transition: opacity 160ms var(--ease); }
+    .l-circle {
+      display: grid;
+      place-items: center;
+      width: 54px;
+      height: 54px;
+      border: 1px solid var(--glass-edge);
+      border-radius: 50%;
+      background: var(--glass);
+      color: var(--text-2);
+      box-shadow: var(--glass-shadow);
+    }
+    .l-circle svg { width: 21px; height: 21px; stroke-width: 1.8; }
+    .launcher.open .l-circles { display: none; }
+    .launcher.open .l-search { border-radius: 22px 22px 0 0; border-bottom-color: transparent; }
+    .l-panel {
+      display: none;
+      border: 1px solid var(--glass-edge);
+      border-top: 1px solid var(--border);
+      border-radius: 0 0 22px 22px;
+      background: var(--glass);
+      box-shadow: var(--glass-shadow);
+      overflow: hidden;
+    }
+    .launcher.open .l-panel { display: block; }
+    .l-list { padding: 6px 8px; min-height: 0; }
+    .l-head { padding: 10px 12px 4px; color: var(--text-3); font-size: 11.5px; font-weight: 600; }
+    .l-head:first-child { padding-top: 6px; }
+    .l-item { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 7px 12px; border-radius: 12px; }
+    .l-item.top { min-height: 60px; }
+    .l-item.sel { background: var(--accent-strong); color: #fff; }
+    .l-icon { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 7px; color: #fff; font-weight: 700; font-size: 13px; }
+    .l-item.top .l-icon { width: 40px; height: 40px; border-radius: 9px; font-size: 16px; }
+    .l-icon svg { width: 18px; height: 18px; }
+    .l-icon.glyph { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text-2); }
+    .l-item.sel .l-icon.glyph { background: rgba(255, 255, 255, 0.22); color: #fff; }
+    .l-info { flex: 1; min-width: 0; }
+    .l-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .l-item.top .l-name { font-size: 15.5px; font-weight: 600; }
+    .l-item.big .l-name { font-size: 18px; }
+    .l-sub { font-size: 12px; color: var(--text-2); }
+    .l-item.sel .l-sub, .l-item.sel .l-kind { color: rgba(255, 255, 255, 0.85); }
+    .l-kind { font-size: 12px; color: var(--text-3); }
+    .l-foot {
       display: flex;
+      justify-content: flex-end;
+      gap: 14px;
+      height: 36px;
       align-items: center;
+      padding: 0 16px;
+      border-top: 1px solid var(--border);
+      color: var(--text-3);
+      font-size: 12px;
+    }
+    .l-foot kbd { min-width: 20px; padding: 0 5px; font-size: 11px; font-weight: 500; color: var(--text-2); background: transparent; }
+    .demo-caption {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 18px;
+      display: flex;
       justify-content: center;
+      gap: 8px;
     }
-    .logo-mark svg {
-      position: relative;
-      z-index: 1;
-      animation: spin-slow 12s linear infinite;
-    }
-    .logo-mark-inner {
-      position: absolute;
-      inset: 6px;
-      background: var(--amber);
+    .demo-dot {
+      width: 8px;
+      height: 8px;
+      padding: 0;
+      border: none;
       border-radius: 50%;
-      animation: glow-pulse 2.5s ease-in-out infinite;
-      box-shadow: 0 0 14px var(--amber-glow);
+      background: rgba(255, 255, 255, 0.45);
+      cursor: pointer;
+      transition: width 200ms var(--ease), background-color 200ms var(--ease);
     }
-    .logo-text { color: var(--text); }
-    .logo-text span { color: var(--amber); }
+    .demo-dot.active { width: 24px; border-radius: 4px; background: #fff; }
 
-    .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 2rem;
-    }
-    .nav-links a {
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: var(--text-2);
-      transition: color 0.2s;
-      letter-spacing: 0.01em;
-    }
-    .nav-links a:hover { color: var(--text); }
+    /* ── Sections ───────────────────────────────────────────────────────── */
+    section { padding: 96px 0; }
+    section.alt { background: var(--bg-alt); }
+    .kicker { color: var(--accent); font-weight: 600; font-size: 14px; letter-spacing: 0.02em; }
+    h2 { margin: 8px 0 0; font-size: clamp(30px, 4vw, 44px); line-height: 1.1; letter-spacing: -0.025em; }
+    .section-lede { margin: 14px 0 0; max-width: 600px; font-size: 17.5px; color: var(--text-2); }
+    .section-head { margin-bottom: 48px; }
+    .section-head.center { text-align: center; }
+    .section-head.center .section-lede { margin-left: auto; margin-right: auto; }
 
-    .nav-cta {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--amber-dim);
-      border: 1px solid rgba(245,158,11,0.25);
-      color: var(--amber);
-      font-family: var(--mono);
-      font-size: 0.8rem;
-      font-weight: 700;
-      padding: 0.45rem 1rem;
-      border-radius: var(--r);
-      transition: background 0.2s, box-shadow 0.2s;
-    }
-    .nav-cta:hover {
-      background: rgba(245,158,11,0.22);
-      box-shadow: 0 0 20px var(--amber-glow);
-    }
+    .grid { display: grid; gap: 18px; }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
 
-    /* ─── HERO ───────────────────────────────────────────────── */
-    .hero {
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      padding: 9rem 0 6rem;
-      overflow: hidden;
+    .card {
+      padding: 26px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
     }
-
-    /* Radial glow orbs */
-    .orb {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(80px);
-      pointer-events: none;
-      z-index: 0;
-    }
-    .orb-1 {
-      width: 600px; height: 600px;
-      top: -150px; left: -100px;
-      background: radial-gradient(circle, rgba(245,158,11,0.12) 0%, transparent 70%);
-      animation: glow-pulse 4s ease-in-out infinite;
-    }
-    .orb-2 {
-      width: 500px; height: 500px;
-      bottom: -100px; right: -100px;
-      background: radial-gradient(circle, rgba(34,211,238,0.1) 0%, transparent 70%);
-      animation: glow-pulse 5s ease-in-out infinite 1.5s;
-    }
-
-    .hero-content {
-      position: relative;
-      z-index: 1;
-      max-width: 760px;
-    }
-
-    .hero-eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-family: var(--mono);
-      font-size: 0.75rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--amber);
-      border: 1px solid rgba(245,158,11,0.25);
-      background: var(--amber-dim);
-      padding: 0.4rem 0.9rem;
-      border-radius: 4px;
-      margin-bottom: 2rem;
-      animation: fadeUp 0.8s cubic-bezier(.2,.8,.2,1) both;
-    }
-    .live-dot {
-      width: 6px; height: 6px;
-      background: var(--amber);
-      border-radius: 50%;
-      box-shadow: 0 0 6px var(--amber);
-      animation: glow-pulse 1.5s ease-in-out infinite;
-    }
-
-    .hero h1 {
-      font-family: var(--display);
-      font-size: clamp(3.2rem, 7vw, 6rem);
-      font-weight: 800;
-      line-height: 1.0;
-      letter-spacing: -0.03em;
-      margin-bottom: 1.5rem;
-      animation: fadeUp 0.8s 0.1s cubic-bezier(.2,.8,.2,1) both;
-    }
-    .hero h1 em {
-      font-style: normal;
-      background: linear-gradient(90deg, var(--amber), #fde68a, var(--amber));
-      background-size: 200% auto;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      animation: shimmer 3s linear infinite;
-    }
-    .hero h1 .line-cyan {
-      font-style: normal;
-      -webkit-text-fill-color: transparent;
-      -webkit-text-stroke: 1.5px rgba(255,255,255,0.35);
-    }
-
-    .hero-sub {
-      font-size: 1.15rem;
-      font-weight: 300;
-      color: var(--text-2);
-      max-width: 560px;
-      margin-bottom: 2.5rem;
-      line-height: 1.75;
-      animation: fadeUp 0.8s 0.2s cubic-bezier(.2,.8,.2,1) both;
-    }
-    .hero-sub strong { color: var(--text); font-weight: 500; }
-
-    .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin-bottom: 3.5rem;
-      animation: fadeUp 0.8s 0.3s cubic-bezier(.2,.8,.2,1) both;
-    }
-
-    .btn-primary {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--amber);
-      color: #000;
-      font-family: var(--mono);
-      font-size: 0.875rem;
-      font-weight: 700;
-      padding: 0.8rem 1.8rem;
-      border-radius: var(--r);
-      transition: box-shadow 0.25s, transform 0.2s;
-      position: relative;
-      overflow: hidden;
-    }
-    .btn-primary::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%);
-      pointer-events: none;
-    }
-    .btn-primary:hover {
-      box-shadow: 0 0 32px var(--amber-glow), 0 4px 16px rgba(0,0,0,0.4);
-      transform: translateY(-1px);
-    }
-
-    .btn-ghost {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: transparent;
-      color: var(--text-2);
-      font-family: var(--mono);
-      font-size: 0.875rem;
-      font-weight: 400;
-      padding: 0.8rem 1.6rem;
-      border-radius: var(--r);
-      border: 1px solid var(--border-hi);
-      transition: color 0.2s, border-color 0.2s, background 0.2s;
-    }
-    .btn-ghost:hover {
-      color: var(--text);
-      border-color: rgba(255,255,255,0.25);
-      background: rgba(255,255,255,0.04);
-    }
-
-    /* Hero terminal mockup */
-    .hero-terminal {
-      animation: fadeUp 0.8s 0.4s cubic-bezier(.2,.8,.2,1) both;
-      position: relative;
-      background: var(--ink-2);
-      border: 1px solid var(--border-hi);
+    .card-icon {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      margin-bottom: 18px;
       border-radius: 12px;
-      overflow: hidden;
-      max-width: 580px;
+      background: var(--accent-soft);
+      color: var(--accent);
     }
-    .terminal-bar {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 12px 16px;
-      background: var(--ink-3);
-      border-bottom: 1px solid var(--border);
-    }
-    .t-dot { width: 10px; height: 10px; border-radius: 50%; }
-    .t-dot.r { background: #ff5f57; }
-    .t-dot.y { background: #febc2e; }
-    .t-dot.g { background: #28c840; }
-    .terminal-title {
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      color: var(--text-3);
-      margin-left: auto;
-    }
-    .terminal-body {
-      padding: 1.25rem 1.5rem;
-      font-family: var(--mono);
-      font-size: 0.82rem;
-      line-height: 1.9;
-      position: relative;
-    }
-    .terminal-body::after {
-      content: '';
-      position: absolute;
-      left: 0; right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--amber-dim), transparent);
-      animation: scanline 3.5s linear infinite;
-      pointer-events: none;
-    }
-    .t-prompt { color: var(--amber); }
-    .t-cmd { color: var(--text); }
-    .t-comment { color: var(--text-3); }
-    .t-success { color: #4ade80; }
-    .t-info { color: var(--cyan); }
-    .t-cursor {
-      display: inline-block;
-      width: 8px; height: 14px;
-      background: var(--amber);
-      vertical-align: middle;
-      animation: blink 1s step-start infinite;
-    }
-    .highlight-line {
-      background: rgba(245,158,11,0.05);
-      border-left: 2px solid var(--amber);
-      padding-left: 12px;
-      margin-left: -12px;
-      display: block;
-    }
+    .card-icon svg { width: 22px; height: 22px; }
+    .card h3 { margin: 0 0 8px; font-size: 18px; letter-spacing: -0.01em; }
+    .card p { margin: 0; color: var(--text-2); font-size: 15px; }
 
-    /* ─── MARQUEE STRIP ──────────────────────────────────────── */
-    .marquee-strip {
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      background: var(--ink-2);
-      padding: 0.7rem 0;
-      overflow: hidden;
-      position: relative;
-      z-index: 1;
-    }
-    .marquee-track {
-      display: flex;
-      width: max-content;
-      animation: marquee 24s linear infinite;
-      gap: 0;
-    }
-    @keyframes marquee {
-      from { transform: translateX(0); }
-      to   { transform: translateX(-50%); }
-    }
-    .marquee-item {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0 2.5rem;
-      font-family: var(--mono);
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-3);
-      white-space: nowrap;
-    }
-    .marquee-dot {
-      width: 4px; height: 4px;
-      background: var(--amber);
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    /* ─── SECTION COMMONS ────────────────────────────────────── */
-    section { position: relative; z-index: 1; }
-    .section-label {
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--amber);
-      margin-bottom: 0.75rem;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .section-label::before {
-      content: '';
-      display: inline-block;
-      width: 20px; height: 1px;
-      background: var(--amber);
-    }
-    .section-h2 {
-      font-family: var(--display);
-      font-size: clamp(2rem, 4vw, 3rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.1;
-      margin-bottom: 1rem;
-    }
-    .section-sub {
-      font-size: 1.05rem;
-      color: var(--text-2);
-      font-weight: 300;
-      max-width: 520px;
-      line-height: 1.75;
-    }
-
-    /* ─── FEATURES ───────────────────────────────────────────── */
-    .features {
-      padding: 8rem 0;
-    }
-    .features-header {
-      margin-bottom: 4rem;
-    }
-
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-    }
-
-    .feature-card {
-      background: var(--ink-2);
-      padding: 2.5rem 2rem;
-      position: relative;
-      transition: background 0.3s;
-      overflow: hidden;
-    }
-    .feature-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--amber-dim), transparent);
-      opacity: 0;
-      transition: opacity 0.4s;
-    }
-    .feature-card:hover { background: var(--ink-3); }
-    .feature-card:hover::before { opacity: 1; }
-
-    .feature-number {
-      font-family: var(--mono);
-      font-size: 0.65rem;
-      color: var(--text-3);
-      letter-spacing: 0.1em;
-      margin-bottom: 1.5rem;
-    }
-
-    .feature-icon {
-      width: 44px; height: 44px;
-      background: var(--amber-dim);
-      border: 1px solid rgba(245,158,11,0.2);
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 1.25rem;
-      color: var(--amber);
-      transition: box-shadow 0.3s;
-    }
-    .feature-card:hover .feature-icon {
-      box-shadow: 0 0 20px var(--amber-glow);
-    }
-    .feature-icon svg { width: 20px; height: 20px; }
-
-    .feature-title {
-      font-family: var(--display);
-      font-size: 1.2rem;
-      font-weight: 700;
-      margin-bottom: 0.75rem;
-      letter-spacing: -0.02em;
-    }
-    .feature-desc {
-      font-size: 0.9rem;
-      color: var(--text-2);
-      line-height: 1.75;
-      font-weight: 300;
-    }
-
-    /* ─── ARCHITECTURE / ENGINE ──────────────────────────────── */
-    .engine {
-      padding: 8rem 0;
-      background: var(--ink-2);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-    .engine-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6rem;
-      align-items: start;
-    }
-    .engine-body p {
-      color: var(--text-2);
-      font-weight: 300;
-      line-height: 1.8;
-      margin-bottom: 1rem;
-    }
-    .engine-body p strong { color: var(--text); font-weight: 500; }
-    .engine-body p:last-child { margin-bottom: 0; }
-
-    .tech-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-top: 2rem;
-    }
-    .tech-tag {
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--cyan);
-      background: var(--cyan-dim);
-      border: 1px solid rgba(34,211,238,0.2);
-      padding: 0.3rem 0.7rem;
-      border-radius: 4px;
-    }
-
-    /* Stat cards */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-    }
-    .stat-cell {
-      background: var(--ink);
-      padding: 2rem 1.75rem;
-      transition: background 0.3s;
-      position: relative;
-      overflow: hidden;
-    }
-    .stat-cell::after {
-      content: '';
-      position: absolute;
-      bottom: 0; left: 1.75rem; right: 1.75rem;
-      height: 1px;
-      background: linear-gradient(90deg, var(--amber), transparent);
-      transform: scaleX(0);
-      transform-origin: left;
-      transition: transform 0.4s;
-    }
-    .stat-cell:hover { background: var(--ink-3); }
-    .stat-cell:hover::after { transform: scaleX(1); }
-    .stat-value {
-      font-family: var(--mono);
-      font-size: 2rem;
-      font-weight: 700;
-      color: var(--amber);
-      line-height: 1;
-      margin-bottom: 0.5rem;
-      animation: float 4s ease-in-out infinite;
-    }
-    .stat-cell:nth-child(2) .stat-value { animation-delay: 0.5s; }
-    .stat-cell:nth-child(3) .stat-value { animation-delay: 1s; }
-    .stat-cell:nth-child(4) .stat-value { animation-delay: 1.5s; }
-    .stat-label {
-      font-size: 0.8rem;
-      color: var(--text-3);
-      font-weight: 400;
-      letter-spacing: 0.03em;
-    }
-
-    /* ─── PRIVACY SECTION ────────────────────────────────────── */
-    .privacy {
-      padding: 8rem 0;
-    }
-    .privacy-layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 5rem;
-      align-items: center;
-    }
-    .privacy-visual {
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 360px;
-    }
-    .privacy-ring {
-      position: absolute;
-      border-radius: 50%;
-      border: 1px dashed;
-    }
-    .ring-1 {
-      width: 280px; height: 280px;
-      border-color: rgba(245,158,11,0.15);
-      animation: spin-slow 20s linear infinite;
-    }
-    .ring-2 {
-      width: 200px; height: 200px;
-      border-color: rgba(34,211,238,0.12);
-      animation: spin-slow 15s linear infinite reverse;
-    }
-    .ring-3 {
-      width: 130px; height: 130px;
-      border-color: rgba(245,158,11,0.2);
-      animation: spin-slow 10s linear infinite;
-    }
-    .privacy-center {
-      position: relative;
-      width: 80px; height: 80px;
-      background: var(--ink-3);
-      border: 1px solid var(--border-hi);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--amber);
-      z-index: 1;
-      box-shadow: 0 0 30px var(--amber-glow);
-    }
-    .privacy-center svg { width: 28px; height: 28px; }
-
-    /* ring labels */
-    .ring-label {
-      position: absolute;
-      font-family: var(--mono);
-      font-size: 0.65rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-3);
-      white-space: nowrap;
-      background: var(--ink);
-      padding: 2px 6px;
-      border-radius: 3px;
-    }
-    .rl-1 { top: 10px; left: 50%; transform: translateX(-50%); color: var(--amber); }
-    .rl-2 { bottom: 10px; right: 30px; }
-    .rl-3 { top: 40%; left: -40px; }
-
-    .privacy-checks {
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-      margin-top: 2rem;
-    }
-    .check-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.875rem;
-    }
-    .check-icon {
-      width: 20px; height: 20px;
-      flex-shrink: 0;
-      background: rgba(74,222,128,0.12);
-      border: 1px solid rgba(74,222,128,0.25);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #4ade80;
-      margin-top: 2px;
-    }
-    .check-icon svg { width: 11px; height: 11px; }
-    .check-text {
-      font-size: 0.925rem;
-      color: var(--text-2);
-      font-weight: 300;
-      line-height: 1.6;
-    }
-    .check-text strong { color: var(--text); font-weight: 500; }
-
-    /* ─── CTA ────────────────────────────────────────────────── */
-    .cta-section {
-      padding: 8rem 0;
-      background: var(--ink-2);
-      border-top: 1px solid var(--border);
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-    .cta-glow {
-      position: absolute;
-      width: 600px; height: 400px;
-      top: 50%; left: 50%;
-      transform: translate(-50%,-50%);
-      background: radial-gradient(ellipse, rgba(245,158,11,0.07) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .cta-section h2 {
-      font-family: var(--display);
-      font-size: clamp(2.5rem, 5vw, 4rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      margin-bottom: 1rem;
-    }
-    .cta-section p {
-      color: var(--text-2);
-      font-size: 1.05rem;
-      font-weight: 300;
-      margin-bottom: 2.5rem;
-    }
-    .cta-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      justify-content: center;
-    }
-    .version-note {
-      margin-top: 1.5rem;
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      color: var(--text-3);
-      letter-spacing: 0.08em;
-    }
-
-    /* ─── FOOTER ─────────────────────────────────────────────── */
-    footer {
-      padding: 3rem 0;
-      border-top: 1px solid var(--border);
-    }
-    .footer-inner {
+    /* Examples */
+    .examples { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 40px; }
+    .example {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 1.5rem;
+      gap: 16px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 15px;
     }
-    .footer-links {
+    .example span { color: var(--text-2); text-align: right; }
+
+    /* Shortcuts */
+    .keys-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 40px; }
+    .key-row {
       display: flex;
-      gap: 2rem;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-2);
+      font-size: 15px;
     }
-    .footer-links a {
-      font-size: 0.85rem;
-      color: var(--text-3);
-      transition: color 0.2s;
+    .key-row .combo { display: flex; gap: 5px; flex: none; }
+
+    /* Privacy */
+    .privacy { display: grid; grid-template-columns: 1fr 1.1fr; gap: 64px; align-items: center; }
+    .checks { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+    .checks li { display: flex; gap: 14px; color: var(--text-2); font-size: 15.5px; }
+    .checks li b { color: var(--text); font-weight: 600; }
+    .check {
+      display: grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      flex: none;
+      margin-top: 1px;
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--ok) 16%, transparent);
+      color: var(--ok);
     }
-    .footer-links a:hover { color: var(--text-2); }
-    .footer-copy {
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      color: var(--text-3);
-      letter-spacing: 0.05em;
+    .check svg { width: 14px; height: 14px; stroke-width: 3; }
+    .note {
+      margin-top: 22px;
+      padding: 16px 18px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      color: var(--text-2);
+      font-size: 14.5px;
     }
 
-    /* ─── RESPONSIVE ─────────────────────────────────────────── */
-    @media (max-width: 1024px) {
-      .engine-grid { gap: 3.5rem; }
-      .privacy-layout { gap: 3rem; }
-    }
+    /* Stack */
+    .stack { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+    .stack .card { padding: 22px; }
+    .stack .card h3 { font-size: 16.5px; }
+    .stack .card p { font-size: 14px; }
 
-    @media (max-width: 860px) {
-      .features-grid { grid-template-columns: 1fr; }
-      .engine-grid { grid-template-columns: 1fr; }
-      .privacy-layout { grid-template-columns: 1fr; }
-      .privacy-visual { min-height: 260px; }
-      .ring-1 { width: 220px; height: 220px; }
-      .ring-2 { width: 160px; height: 160px; }
-      .ring-3 { width: 100px; height: 100px; }
-      .stats-grid { grid-template-columns: 1fr 1fr; }
+    /* CTA */
+    .cta {
+      padding: 64px 32px;
+      border-radius: 28px;
+      text-align: center;
+      color: #fff;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(255, 196, 120, 0.55) 0, transparent 40%),
+        radial-gradient(circle at 90% 90%, rgba(139, 92, 246, 0.6) 0, transparent 45%),
+        linear-gradient(140deg, #2f6fe4, #1d3f8f);
     }
+    .cta h2 { color: #fff; }
+    .cta p { margin: 14px auto 0; max-width: 520px; color: rgba(255, 255, 255, 0.85); font-size: 17px; }
+    .cta .btn-primary { background: #fff; color: #1d3f8f; box-shadow: none; }
+    .cta .btn-primary:hover { background: #f1f5ff; }
+    .cta .btn-ghost { background: transparent; border-color: rgba(255, 255, 255, 0.4); color: #fff; }
+    .cta .btn-ghost:hover { border-color: #fff; }
+    .cta .fineprint { color: rgba(255, 255, 255, 0.75); }
 
-    @media (max-width: 640px) {
+    /* Footer */
+    footer { padding: 36px 0 48px; border-top: 1px solid var(--border); color: var(--text-3); font-size: 14px; }
+    .foot { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+    .foot .brand { font-size: 15px; color: var(--text-2); }
+    .foot .brand img { width: 24px; height: 24px; }
+    .foot nav { display: flex; gap: 22px; margin-left: auto; }
+    .foot nav a:hover { color: var(--text); }
+
+    /* Reveal */
+    .reveal { opacity: 0; transform: translateY(14px); transition: opacity 600ms var(--ease), transform 600ms var(--ease); }
+    .reveal.in { opacity: 1; transform: none; }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── Responsive ─────────────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .grid-3, .stack { grid-template-columns: repeat(2, 1fr); }
+      .privacy { grid-template-columns: 1fr; gap: 32px; }
       .nav-links { display: none; }
-      .hero-actions { flex-direction: column; }
-      .btn-primary, .btn-ghost { width: 100%; justify-content: center; }
-      .footer-inner { flex-direction: column; align-items: flex-start; }
+      .nav .btn { margin-left: auto; }
+    }
+    @media (max-width: 640px) {
+      section { padding: 72px 0; }
+      .hero { padding-top: 48px; }
+      .grid-3, .grid-2, .stack, .examples, .keys-list { grid-template-columns: 1fr; }
+      .demo-stage { padding: 32px 12px 52px; border-radius: 20px; }
+      .l-circles { display: none; }
+      .l-kind, .l-foot .opt { display: none; }
+      .cta { padding: 48px 20px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .reveal { opacity: 1; transform: none; }
     }
   </style>
 </head>
 <body>
 
-<div class="grid-bg"></div>
-
-<!-- ─── NAV ─────────────────────────────────────────────────── -->
-<nav id="navbar">
-  <div class="container nav-inner">
-    <a href="#" class="logo">
-      <div class="logo-mark">
-        <div class="logo-mark-inner"></div>
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-          <circle cx="16" cy="16" r="14" stroke="rgba(245,158,11,0.3)" stroke-width="1" stroke-dasharray="3 4"/>
-        </svg>
-      </div>
-      <span class="logo-text">Spotlight<span>-Win</span></span>
+<!-- ── Nav ─────────────────────────────────────────────────────────────── -->
+<header class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <a href="#" class="brand" aria-label="Spotlight-Win home">
+      <img src="public/app_icon.png" alt="" width="30" height="30" />
+      Spotlight-Win
     </a>
-    <div class="nav-links">
+    <nav class="nav-links" aria-label="Sections">
       <a href="#features">Features</a>
-      <a href="#engine">Engine</a>
+      <a href="#shortcuts">Shortcuts</a>
       <a href="#privacy">Privacy</a>
       <a href="https://github.com/Snaehath/Win-Spotlight">GitHub</a>
-    </div>
-    <a href="https://github.com/Snaehath/Win-Spotlight/releases" class="nav-cta">
-      <i data-lucide="package" style="width:13px;height:13px;"></i>
-      v0.4.5 Beta
-    </a>
-  </div>
-</nav>
-
-<!-- ─── HERO ─────────────────────────────────────────────────── -->
-<header class="hero">
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="container">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:5rem;align-items:center;">
-      <div class="hero-content">
-        <div class="hero-eyebrow">
-          <span class="live-dot"></span>
-          Tantivy Engine — Now Live
-        </div>
-        <h1>The Elite<br><em>Insight Engine</em><br><span class="line-cyan">for Windows.</span></h1>
-        <p class="hero-sub">
-          A high-fidelity search utility engineered for power users. <strong>Zero Ads. Zero Bing. Zero Telemetry.</strong> Built in Rust for absolute desktop mastery.
-        </p>
-        <div class="hero-actions">
-          <a href="https://github.com/Snaehath/Win-Spotlight/releases" class="btn-primary">
-            <i data-lucide="download" style="width:16px;height:16px;"></i>
-            Download for Windows
-          </a>
-          <a href="https://github.com/Snaehath/Win-Spotlight" class="btn-ghost">
-            <i data-lucide="github" style="width:16px;height:16px;"></i>
-            View Source
-          </a>
-        </div>
-      </div>
-
-      <div class="hero-terminal">
-        <div class="terminal-bar">
-          <span class="t-dot r"></span>
-          <span class="t-dot y"></span>
-          <span class="t-dot g"></span>
-          <span class="terminal-title">spotlight-win — indexer</span>
-        </div>
-        <div class="terminal-body">
-          <div><span class="t-comment">// v0.4.5 Tantivy engine loaded</span></div>
-          <div><span class="t-prompt">❯ </span><span class="t-cmd">spotlight-win --start-indexer</span></div>
-          <div class="highlight-line"><span class="t-success">✓ Index mounted</span> <span class="t-comment">[ 142,847 files ]</span></div>
-          <div><span class="t-info">→ Engine:</span> <span class="t-cmd">Tantivy (Rust)</span></div>
-          <div><span class="t-info">→ Latency:</span> <span class="t-cmd">&lt; 10ms avg</span></div>
-          <div><span class="t-info">→ CPU:</span> <span class="t-cmd">0.3% overhead</span></div>
-          <div><span class="t-info">→ Cloud:</span> <span class="t-cmd" style="color:#f87171;">disabled ✗</span></div>
-          <div style="margin-top:0.5rem;"><span class="t-prompt">❯ </span><span class="t-cmd">search "project ideas"</span></div>
-          <div class="highlight-line"><span class="t-success">✓ 7 results</span> <span class="t-comment">in 4ms</span></div>
-          <div><span class="t-prompt">❯ </span><span class="t-cursor"></span></div>
-        </div>
-      </div>
-    </div>
+    </nav>
+    <a class="btn btn-primary js-download" href="https://github.com/Snaehath/Win-Spotlight/releases/latest">Download</a>
   </div>
 </header>
 
-<!-- ─── MARQUEE ───────────────────────────────────────────────── -->
-<div class="marquee-strip">
-  <div class="marquee-track">
-    <!-- duplicated for seamless loop -->
-    <span class="marquee-item"><span class="marquee-dot"></span>Privacy-First</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Rust Backend</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Zero Cloud</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Tantivy Engine</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Sub-10ms Query</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Open Source</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Zero Ads</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Tauri Frontend</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Fuzzy Matching</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>No Bing</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Privacy-First</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Rust Backend</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Zero Cloud</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Tantivy Engine</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Sub-10ms Query</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Open Source</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Zero Ads</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Tauri Frontend</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>Fuzzy Matching</span>
-    <span class="marquee-item"><span class="marquee-dot"></span>No Bing</span>
-  </div>
-</div>
-
-<!-- ─── FEATURES ─────────────────────────────────────────────── -->
-<section class="features" id="features">
-  <div class="container">
-    <div class="features-header">
-      <div class="section-label reveal">Core Capabilities</div>
-      <h2 class="section-h2 reveal d1">Engineered for<br>Power Users.</h2>
-      <p class="section-sub reveal d2">Stop searching blindly. Start finding instantly with precision-crafted tools built for the modern developer workspace.</p>
-    </div>
-    <div class="features-grid reveal d3">
-      <div class="feature-card">
-        <div class="feature-number">01</div>
-        <div class="feature-icon"><i data-lucide="zap"></i></div>
-        <div class="feature-title">Silent Intelligence</div>
-        <p class="feature-desc">Optimised background indexing that consumes less than 1% CPU. Incredibly fast, perfectly quiet, and practically invisible until you need it.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-number">02</div>
-        <div class="feature-icon"><i data-lucide="shield-check"></i></div>
-        <div class="feature-title">Zero-Cloud Privacy</div>
-        <p class="feature-desc">Your data stays completely on your local disk. No telemetry, no web tracking, no account required — and absolutely zero injected Bing results.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-number">03</div>
-        <div class="feature-icon"><i data-lucide="layers"></i></div>
-        <div class="feature-title">Instant Previews</div>
-        <p class="feature-desc">Rich metadata, full file paths, and instant content previews without ever leaving the search bar. Real-time context at the speed of thought.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-number">04</div>
-        <div class="feature-icon"><i data-lucide="text-search"></i></div>
-        <div class="feature-title">Full-Text Indexing</div>
-        <p class="feature-desc">Deep file content search powered by Tantivy. Find the exact line inside a document, not just the filename — across hundreds of thousands of files.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-number">05</div>
-        <div class="feature-icon"><i data-lucide="wand-2"></i></div>
-        <div class="feature-title">Fuzzy Matching</div>
-        <p class="feature-desc">Typo-tolerant smart search understands intent, not just exact strings. Handles abbreviations, partial names, and developer shorthand effortlessly.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-number">06</div>
-        <div class="feature-icon"><i data-lucide="command"></i></div>
-        <div class="feature-title">Keyboard-First</div>
-        <p class="feature-desc">Designed from the ground up for keyboard power users. Every action has a shortcut. Your hands never need to leave the keys.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ─── ENGINE ───────────────────────────────────────────────── -->
-<section class="engine" id="engine">
-  <div class="container">
-    <div class="engine-grid">
-      <div class="engine-body reveal">
-        <div class="section-label">Architecture</div>
-        <h2 class="section-h2">Built on<br>Modern Steel.</h2>
-        <p>Spotlight-Win isn't another bloated Electron wrapper. It's engineered with a low-level <strong>Rust backend</strong> and a lightweight <strong>Tauri webview</strong> frontend — your system resources belong to your work, not to your search bar.</p>
-        <p>Powered by the bare-metal <strong>Tantivy search library</strong>, we deliver full-text indexing and fuzzy matching that outpaces native Windows Search by an order of magnitude.</p>
-        <p>Every architectural decision was made to eliminate waste: no Node.js runtime, no Chromium overhead, no cloud dependency. Just a single lean binary that does one thing perfectly.</p>
-        <div class="tech-tags">
-          <span class="tech-tag">Rust</span>
-          <span class="tech-tag">Tauri</span>
-          <span class="tech-tag">Tantivy</span>
-          <span class="tech-tag">React</span>
-          <span class="tech-tag">Windows API</span>
-          <span class="tech-tag">NTFS</span>
-        </div>
-      </div>
-      <div class="reveal d2">
-        <div class="stats-grid">
-          <div class="stat-cell">
-            <div class="stat-value">&lt;10ms</div>
-            <div class="stat-label">Query Latency</div>
-          </div>
-          <div class="stat-cell">
-            <div class="stat-value">&lt;1%</div>
-            <div class="stat-label">CPU Overhead</div>
-          </div>
-          <div class="stat-cell">
-            <div class="stat-value">100%</div>
-            <div class="stat-label">Offline Local</div>
-          </div>
-          <div class="stat-cell">
-            <div class="stat-value">Rust</div>
-            <div class="stat-label">Core Engine</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ─── PRIVACY ──────────────────────────────────────────────── -->
-<section class="privacy" id="privacy">
-  <div class="container">
-    <div class="privacy-layout">
-      <div class="privacy-visual reveal">
-        <div class="privacy-ring ring-1"></div>
-        <div class="privacy-ring ring-2"></div>
-        <div class="privacy-ring ring-3"></div>
-        <div class="privacy-center">
-          <i data-lucide="lock"></i>
-        </div>
-        <span class="ring-label rl-1">Local Only</span>
-        <span class="ring-label rl-2">No Telemetry</span>
-        <span class="ring-label rl-3">Zero Cloud</span>
-      </div>
-      <div class="reveal d2">
-        <div class="section-label">Privacy Model</div>
-        <h2 class="section-h2">Your Machine.<br>Your Data.</h2>
-        <p class="section-sub" style="margin-bottom:0;">Every byte searched stays on your drive. We don't phone home — ever.</p>
-        <div class="privacy-checks">
-          <div class="check-row">
-            <div class="check-icon"><i data-lucide="check"></i></div>
-            <div class="check-text"><strong>No cloud sync</strong> — index lives entirely on your local filesystem</div>
-          </div>
-          <div class="check-row">
-            <div class="check-icon"><i data-lucide="check"></i></div>
-            <div class="check-text"><strong>No telemetry</strong> — zero usage data, analytics, or crash reports sent anywhere</div>
-          </div>
-          <div class="check-row">
-            <div class="check-icon"><i data-lucide="check"></i></div>
-            <div class="check-text"><strong>No account</strong> — install and run immediately, no sign-up required</div>
-          </div>
-          <div class="check-row">
-            <div class="check-icon"><i data-lucide="check"></i></div>
-            <div class="check-text"><strong>No Bing injection</strong> — results come exclusively from your own files</div>
-          </div>
-          <div class="check-row">
-            <div class="check-icon"><i data-lucide="check"></i></div>
-            <div class="check-text"><strong>Open source</strong> — every line auditable on GitHub, always</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ─── CTA ──────────────────────────────────────────────────── -->
-<section class="cta-section">
-  <div class="cta-glow"></div>
-  <div class="container" style="position:relative;z-index:1;">
-    <div class="reveal">
-      <div class="section-label" style="justify-content:center;">Get Started</div>
-      <h2>Search faster.<br>Own your data.</h2>
-      <p>Free, open-source, and built for people who demand more from their tools.</p>
-      <div class="cta-actions">
-        <a href="https://github.com/Snaehath/Win-Spotlight/releases/download/v0.4.5/spotlight-win_0.4.5_x64-setup.zip" class="btn-primary">
-          <i data-lucide="download" style="width:16px;height:16px;"></i>
+<main>
+  <!-- ── Hero ──────────────────────────────────────────────────────────── -->
+  <div class="hero">
+    <div class="wrap">
+      <span class="eyebrow"><b class="js-version">Latest</b> Free for Windows 10 &amp; 11</span>
+      <h1>Everything on your PC,<br /><span class="grad">one keystroke away.</span></h1>
+      <p class="lede">
+        Press <kbd>Ctrl</kbd> <kbd>Space</kbd>, type a few letters, press <kbd>Enter</kbd>.
+        Spotlight-Win finds apps, files and folders, does maths and currency conversions, and runs system actions without leaving the keyboard.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary js-download" href="https://github.com/Snaehath/Win-Spotlight/releases/latest">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
           Download for Windows
         </a>
-        <a href="https://github.com/Snaehath/Win-Spotlight" class="btn-ghost">
-          <i data-lucide="github" style="width:16px;height:16px;"></i>
-          Star on GitHub
+        <a class="btn btn-ghost" href="https://github.com/Snaehath/Win-Spotlight">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg>
+          View on GitHub
         </a>
       </div>
-      <p class="version-note">CURRENT RELEASE — v0.4.5 BETA — WINDOWS 10/11 — 64-BIT</p>
+      <p class="fineprint">Free · Windows 10 &amp; 11 (64-bit) · No account needed</p>
+
+      <!-- Live demo -->
+      <div class="demo-stage" aria-label="Animated demo of the Spotlight-Win launcher">
+        <div class="launcher" id="launcher" aria-hidden="true">
+          <div class="l-row">
+            <div class="l-search">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+              <span class="l-chip" id="l-chip" hidden></span>
+              <span class="l-query placeholder" id="l-query">Spotlight Search</span>
+              <span class="l-caret"></span>
+            </div>
+            <div class="l-circles">
+              <span class="l-circle"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
+              <span class="l-circle"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>
+              <span class="l-circle"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
+              <span class="l-circle"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3m5 0h5"/></svg></span>
+            </div>
+          </div>
+          <div class="l-panel">
+            <div class="l-list" id="l-list"></div>
+            <div class="l-foot">
+              <span class="opt"><kbd>↑</kbd> <kbd>↓</kbd> Navigate</span>
+              <span><kbd>↵</kbd> <span id="l-action">Open</span></span>
+              <span class="opt"><kbd>F1</kbd> Help</span>
+            </div>
+          </div>
+        </div>
+        <div class="demo-caption" id="demo-dots" role="tablist" aria-label="Demo scenes"></div>
+      </div>
     </div>
   </div>
-</section>
 
-<!-- ─── FOOTER ───────────────────────────────────────────────── -->
-<footer>
-  <div class="container">
-    <div class="footer-inner">
-      <a href="#" class="logo">
-        <div class="logo-mark" style="opacity:0.7;">
-          <div class="logo-mark-inner"></div>
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <circle cx="16" cy="16" r="14" stroke="rgba(245,158,11,0.3)" stroke-width="1" stroke-dasharray="3 4"/>
-          </svg>
-        </div>
-        <span class="logo-text" style="opacity:0.7;">Spotlight<span>-Win</span></span>
-      </a>
-      <div class="footer-links">
-        <a href="https://github.com/Snaehath/Win-Spotlight">GitHub</a>
-        <a href="https://github.com/Snaehath/Win-Spotlight/releases">Releases</a>
-        <a href="https://github.com/Snaehath/Win-Spotlight/issues">Issues</a>
+  <!-- ── Features ──────────────────────────────────────────────────────── -->
+  <section id="features">
+    <div class="wrap">
+      <div class="section-head center reveal">
+        <div class="kicker">Features</div>
+        <h2>One box for everything you reach for.</h2>
+        <p class="section-lede">No mouse trips to the Start menu, no digging through Explorer. Just type.</p>
       </div>
-      <p class="footer-copy">&copy; 2026 Spotlight-Win Project</p>
+      <div class="grid grid-3">
+        <article class="card reveal">
+          <div class="card-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+          <h3>Instant app search</h3>
+          <p>Every app from the Start menu, desktop and Microsoft Store, with duplicate shortcuts merged into one clean result.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+          <h3>Files &amp; folders</h3>
+          <p>Find files and folders by name across Downloads, Documents, Pictures, your desktop and drives. <kbd>Shift</kbd> <kbd>Enter</kbd> reveals one in Explorer.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M12 20v-6M6 20V10M18 20V4"/></svg></div>
+          <h3>Learns what you use</h3>
+          <p>Results rank by how often you open them, and when. Your morning apps rise in the morning. The best match is always the Top Hit.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-icon"><svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h4"/></svg></div>
+          <h3>Maths &amp; currency</h3>
+          <p>Type <code>12*(3+4)</code> or <code>100 usd to eur</code> and get the answer as you type. <kbd>Enter</kbd> copies it.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M9 17H7A5 5 0 0 1 7 7h2m6 0h2a5 5 0 0 1 0 10h-2M8 12h8"/></svg></div>
+          <h3>Web shortcuts</h3>
+          <p>Type a URL to open it, then <kbd>Ctrl</kbd> <kbd>Enter</kbd> to save it under a short name like <code>gh</code>. Search the web with <code>&gt; g</code>.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg></div>
+          <h3>System actions</h3>
+          <p>Lock, sleep, restart or shut down with a confirmation first, or type <code>system</code> for live CPU, memory and disk usage.</p>
+        </article>
+      </div>
     </div>
+  </section>
+
+  <!-- ── Examples ──────────────────────────────────────────────────────── -->
+  <section class="alt" id="examples">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="kicker">Try it</div>
+        <h2>Just type what you mean.</h2>
+        <p class="section-lede">A few things you can type, with no prefixes or menus needed.</p>
+      </div>
+      <div class="examples reveal">
+        <div class="example"><code>vsc</code><span>Visual Studio Code, by acronym</span></div>
+        <div class="example"><code>folder:invoices</code><span>Only folders named “invoices”</span></div>
+        <div class="example"><code>2^10</code><span>1024, ready to copy</span></div>
+        <div class="example"><code>€50 in inr</code><span>Live currency conversion</span></div>
+        <div class="example"><code>github.com</code><span>Open it, or save it as a shortcut</span></div>
+        <div class="example"><code>&gt; g rust lifetimes</code><span>Google search in your browser</span></div>
+        <div class="example"><code>lock</code><span>Lock the screen, after confirming</span></div>
+        <div class="example"><code>system</code><span>CPU, memory and disk usage</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Shortcuts ─────────────────────────────────────────────────────── -->
+  <section id="shortcuts">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <div class="kicker">Keyboard first</div>
+        <h2>Your hands never leave the keys.</h2>
+        <p class="section-lede">Every action has a shortcut. Press <kbd>F1</kbd> in the launcher to see them all.</p>
+      </div>
+      <div class="keys-list reveal">
+        <div class="key-row">Show or hide the launcher <span class="combo"><kbd>Ctrl</kbd><kbd>Space</kbd></span></div>
+        <div class="key-row">Move through results <span class="combo"><kbd>↑</kbd><kbd>↓</kbd></span></div>
+        <div class="key-row">Open the selected result <span class="combo"><kbd>Enter</kbd></span></div>
+        <div class="key-row">Reveal in Explorer <span class="combo"><kbd>Shift</kbd><kbd>Enter</kbd></span></div>
+        <div class="key-row">Copy path or URL <span class="combo"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>C</kbd></span></div>
+        <div class="key-row">Save URL as a shortcut <span class="combo"><kbd>Ctrl</kbd><kbd>Enter</kbd></span></div>
+        <div class="key-row">Forget an item's history <span class="combo"><kbd>Alt</kbd><kbd>Enter</kbd></span></div>
+        <div class="key-row">Hide the launcher <span class="combo"><kbd>Esc</kbd></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Privacy ───────────────────────────────────────────────────────── -->
+  <section class="alt" id="privacy">
+    <div class="wrap privacy">
+      <div class="reveal">
+        <div class="kicker">Privacy</div>
+        <h2>Your files stay on your PC.</h2>
+        <p class="section-lede">Spotlight-Win searches your computer, not the internet. There's nothing to sign up for and nothing running in the cloud.</p>
+      </div>
+      <div class="reveal">
+        <ul class="checks">
+          <li><span class="check"><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg></span><span><b>Local index.</b> File names, launch history and shortcuts are stored only in your Windows profile.</span></li>
+          <li><span class="check"><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg></span><span><b>No telemetry or ads.</b> No analytics and no tracking, and nothing about your searches leaves your PC.</span></li>
+          <li><span class="check"><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg></span><span><b>No account.</b> Install it and press <kbd>Ctrl</kbd> <kbd>Space</kbd>.</span></li>
+          <li><span class="check"><svg viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></svg></span><span><b>No web results mixed in.</b> Results come from your own apps and files.</span></li>
+        </ul>
+        <p class="note">
+          <b>The one exception:</b> when you type a currency conversion, Spotlight-Win fetches exchange rates from
+          <a href="https://www.frankfurter.app/" style="color:var(--accent)">frankfurter.app</a> (European Central Bank data), cached for an hour. Your search text is never sent.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Stack ─────────────────────────────────────────────────────────── -->
+  <section id="built-with">
+    <div class="wrap">
+      <div class="section-head center reveal">
+        <div class="kicker">Under the hood</div>
+        <h2>Native, small and quick.</h2>
+        <p class="section-lede">A Rust core with a lightweight system webview, not a bundled browser. It idles quietly in your tray until you need it.</p>
+      </div>
+      <div class="stack">
+        <article class="card reveal"><h3>Rust</h3><p>Indexing, ranking, launching and Windows integration, all in native code.</p></article>
+        <article class="card reveal"><h3>Tauri 2</h3><p>A tiny app shell using the WebView2 already on Windows, so no Chromium is bundled.</p></article>
+        <article class="card reveal"><h3>Tantivy</h3><p>A Rust search library behind the name index, with prefix and multi-word matching.</p></article>
+        <article class="card reveal"><h3>Windows APIs</h3><p>Native app icons, Shell launching, process detection and system stats.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA ───────────────────────────────────────────────────────────── -->
+  <section id="download" style="padding-top:0">
+    <div class="wrap">
+      <div class="cta reveal">
+        <h2>Press Ctrl + Space and go.</h2>
+        <p>Download the installer, run it, and Spotlight-Win starts in your tray. It launches automatically every time you sign in.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary js-download" href="https://github.com/Snaehath/Win-Spotlight/releases/latest">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
+            Download for Windows <span class="btn-meta js-version-inline"></span>
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/Snaehath/Win-Spotlight/releases">All releases</a>
+        </div>
+        <p class="fineprint">Windows 10 &amp; 11, 64-bit. WebView2 is included in Windows 11, and the installer adds it on Windows 10 if needed.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <a href="#" class="brand"><img src="public/app_icon.png" alt="" width="24" height="24" /> Spotlight-Win</a>
+    <nav aria-label="Footer">
+      <a href="https://github.com/Snaehath/Win-Spotlight">GitHub</a>
+      <a href="https://github.com/Snaehath/Win-Spotlight/releases">Releases</a>
+      <a href="https://github.com/Snaehath/Win-Spotlight/issues">Report an issue</a>
+    </nav>
   </div>
 </footer>
 
 <script>
-  // Icons — init after DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => lucide.createIcons());
-  } else {
-    lucide.createIcons();
-  }
+  // ── Sticky nav border ──────────────────────────────────────────────────
+  const nav = document.getElementById("nav");
+  const onScroll = () => nav.classList.toggle("scrolled", window.scrollY > 8);
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
 
-  // Sticky nav
-  const navbar = document.getElementById('navbar');
-  window.addEventListener('scroll', () => {
-    navbar.classList.toggle('scrolled', window.scrollY > 20);
-  }, { passive: true });
-
-  // Smooth scroll
-  document.querySelectorAll('a[href^="#"]').forEach(a => {
-    a.addEventListener('click', e => {
-      const t = document.querySelector(a.getAttribute('href'));
-      if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth' }); }
-    });
-  });
-
-  // Reveal on scroll
-  const io = new IntersectionObserver(entries => {
-    entries.forEach(e => {
-      if (e.isIntersecting) {
-        e.target.classList.add('visible');
-        io.unobserve(e.target);
-      }
-    });
-  }, { threshold: 0.12 });
-  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
-
-  // Hero layout responsive
-  function heroLayout() {
-    const heroGrid = document.querySelector('.hero .container > div');
-    if (heroGrid) {
-      if (window.innerWidth < 860) {
-        heroGrid.style.gridTemplateColumns = '1fr';
-        heroGrid.style.gap = '3rem';
-      } else {
-        heroGrid.style.gridTemplateColumns = '1fr 1fr';
-        heroGrid.style.gap = '5rem';
+  // ── Reveal on scroll ───────────────────────────────────────────────────
+  const io = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("in");
+        io.unobserve(entry.target);
       }
     }
-  }
-  heroLayout();
-  window.addEventListener('resize', heroLayout);
+  }, { threshold: 0.12 });
+  document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
 
-  // Typed terminal effect - subtle re-animation on first view
-  const terminalLines = document.querySelectorAll('.terminal-body > div');
-  terminalLines.forEach((line, i) => {
-    line.style.opacity = '0';
-    setTimeout(() => {
-      line.style.transition = 'opacity 0.3s';
-      line.style.opacity = '1';
-    }, 600 + i * 120);
+  // ── Latest release: version label + direct installer link ─────────────
+  // Falls back to the /releases/latest page if the API is unavailable.
+  fetch("https://api.github.com/repos/Snaehath/Win-Spotlight/releases?per_page=5")
+    .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+    .then((releases) => {
+      const release = releases.find((r) => !r.draft);
+      if (!release) return;
+      const version = release.tag_name.startsWith("v") ? release.tag_name : `v${release.tag_name}`;
+      document.querySelector(".js-version").textContent = version;
+      document.querySelector(".js-version-inline").textContent = version;
+      const asset =
+        release.assets.find((a) => /setup\.exe$/i.test(a.name)) ||
+        release.assets.find((a) => /\.msi$/i.test(a.name)) ||
+        release.assets.find((a) => /\.(exe|zip)$/i.test(a.name));
+      const href = asset ? asset.browser_download_url : release.html_url;
+      document.querySelectorAll(".js-download").forEach((a) => (a.href = href));
+    })
+    .catch(() => {});
+
+  // ── Launcher demo ──────────────────────────────────────────────────────
+  const ICONS = {
+    calc: '<svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h4"/></svg>',
+    folder: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+    file: '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
+    lock: '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+    globe: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+  };
+  const app = (letter, color) => ({ letter, color });
+
+  const SCENES = [
+    {
+      query: "vsc",
+      action: "Open",
+      rows: [
+        { group: "Top Hit", name: "Visual Studio Code", kind: "Application", icon: app("VS", "#2f80ed") },
+        { group: "Applications", name: "Visual Studio Installer", kind: "Application", icon: app("VI", "#7c4dff") },
+        { group: "Folders", name: "vscode-snippets", sub: "in Projects", kind: "Folder", glyph: "folder" },
+      ],
+    },
+    {
+      query: "45*12",
+      action: "Copy",
+      rows: [{ group: "Top Hit", name: "540", sub: "45 * 12  ·  Enter to copy", glyph: "calc", big: true }],
+    },
+    {
+      chip: "Folders",
+      query: "invoices",
+      action: "Open Folder",
+      rows: [
+        { group: "Top Hit", name: "Invoices 2026", sub: "in Documents", kind: "Folder", glyph: "folder" },
+        { group: "Folders", name: "invoices", sub: "in Downloads", kind: "Folder", glyph: "folder" },
+        { group: "Folders", name: "invoices-archive", sub: "in Work", kind: "Folder", glyph: "folder" },
+      ],
+    },
+    {
+      query: "github.com",
+      action: "Open in Browser",
+      rows: [{ group: "Top Hit", name: "Open github.com", sub: "github.com  ·  Ctrl+Enter to save as shortcut", kind: "Website", glyph: "globe" }],
+    },
+    {
+      query: "lock",
+      action: "Run",
+      rows: [{ group: "Top Hit", name: "Lock Screen", sub: "System action", kind: "Command", glyph: "lock" }],
+    },
+  ];
+
+  const launcher = document.getElementById("launcher");
+  const queryEl = document.getElementById("l-query");
+  const chipEl = document.getElementById("l-chip");
+  const listEl = document.getElementById("l-list");
+  const actionEl = document.getElementById("l-action");
+  const dotsEl = document.getElementById("demo-dots");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+  function rowHtml(row, index) {
+    const icon = row.icon
+      ? `<span class="l-icon" style="background:${row.icon.color}">${row.icon.letter}</span>`
+      : `<span class="l-icon glyph">${ICONS[row.glyph]}</span>`;
+    const cls = ["l-item", index === 0 && "top sel", row.big && "big"].filter(Boolean).join(" ");
+    return `<div class="${cls}">${icon}<div class="l-info"><div class="l-name">${esc(row.name)}</div>${row.sub ? `<div class="l-sub">${esc(row.sub)}</div>` : ""}</div>${row.kind && index !== 0 ? `<span class="l-kind">${row.kind}</span>` : ""}</div>`;
+  }
+
+  function showResults(scene) {
+    let last = null;
+    listEl.innerHTML = scene.rows
+      .map((row, i) => {
+        const head = row.group !== last ? `<div class="l-head">${row.group}</div>` : "";
+        last = row.group;
+        return head + rowHtml(row, i);
+      })
+      .join("");
+    actionEl.textContent = scene.action;
+    launcher.classList.add("open");
+  }
+
+  function setQuery(text, scene) {
+    chipEl.hidden = !scene?.chip;
+    chipEl.textContent = scene?.chip || "";
+    queryEl.classList.toggle("placeholder", !text);
+    queryEl.textContent = text || (scene?.chip ? "" : "Spotlight Search");
+  }
+
+  function reset() {
+    launcher.classList.remove("open");
+    setQuery("", null);
+  }
+
+  let sceneIndex = 0;
+  let timers = [];
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
+
+  function play(index) {
+    clearTimers();
+    sceneIndex = index;
+    dotsEl.querySelectorAll(".demo-dot").forEach((d, i) => {
+      d.classList.toggle("active", i === index);
+      d.setAttribute("aria-selected", String(i === index));
+    });
+    const scene = SCENES[index];
+
+    if (reduceMotion) {
+      setQuery(scene.query, scene);
+      showResults(scene);
+      return;
+    }
+
+    reset();
+    let t = 700;
+    if (scene.chip) later(() => setQuery("", scene), (t += 250));
+    for (let i = 1; i <= scene.query.length; i++) {
+      later(() => {
+        setQuery(scene.query.slice(0, i), scene);
+        if (i === scene.query.length) showResults(scene);
+      }, (t += 95));
+    }
+    later(() => play((index + 1) % SCENES.length), t + 2600);
+  }
+
+  SCENES.forEach((scene, i) => {
+    const dot = document.createElement("button");
+    dot.className = "demo-dot";
+    dot.type = "button";
+    dot.setAttribute("role", "tab");
+    dot.setAttribute("aria-label", `Show example: ${scene.chip ? scene.chip.toLowerCase() + ": " : ""}${scene.query}`);
+    dot.addEventListener("click", () => play(i));
+    dotsEl.appendChild(dot);
   });
+
+  // Only animate while the demo is on screen.
+  const stage = document.querySelector(".demo-stage");
+  let started = false;
+  new IntersectionObserver(([entry]) => {
+    if (entry.isIntersecting && !started) {
+      started = true;
+      play(0);
+    } else if (!entry.isIntersecting && started && !reduceMotion) {
+      clearTimers();
+      started = false;
+    }
+  }, { threshold: 0.3 }).observe(stage);
 </script>
 </body>
 </html>
