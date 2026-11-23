@@ -1,40 +1,47 @@
 /* ── Design tokens ─────────────────────────────────────────────────────────── */
+/* Light is the default "frosted" look; dark follows the Windows app theme.     */
+/* Note: CSS can't blur the desktop behind a transparent window, so the glass   */
+/* is a high-opacity tint with a highlight edge rather than a true blur.        */
 
 :root {
-  --surface: rgba(17, 20, 28, 0.97);
-  --surface-solid: #11141c;
-  --surface-raised: #1b2030;
-  --surface-hover: rgba(255, 255, 255, 0.045);
-  --surface-selected: rgba(96, 140, 255, 0.16);
-  --surface-chip: rgba(255, 255, 255, 0.06);
-  --overlay-scrim: rgba(8, 10, 16, 0.72);
+  --glass: rgba(233, 240, 250, 0.86);
+  --glass-solid: #eef3fa;
+  --glass-edge: rgba(255, 255, 255, 0.75);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --glass-shadow: 0 12px 32px rgba(15, 30, 60, 0.22), 0 1px 3px rgba(15, 30, 60, 0.12);
 
-  --text: #eef1f6;
-  --text-secondary: #9aa3b5;
-  --text-tertiary: #6b7386;
+  --surface-hover: rgba(15, 35, 70, 0.06);
+  --surface-chip: rgba(15, 35, 70, 0.07);
+  --overlay-scrim: rgba(225, 233, 245, 0.7);
 
-  --accent: #6b93ff;
-  --accent-strong: #4f7cff;
-  --accent-soft: rgba(107, 147, 255, 0.14);
-  --accent-border: rgba(107, 147, 255, 0.35);
-  --danger: #ef5350;
-  --danger-soft: rgba(239, 83, 80, 0.14);
+  --text: #10182a;
+  --text-secondary: #4b5873;
+  --text-tertiary: #7a869c;
 
-  --border: rgba(255, 255, 255, 0.09);
-  --border-subtle: rgba(255, 255, 255, 0.05);
+  --accent: #2f6fe4;
+  --accent-strong: #1f5fd6;
+  --accent-soft: rgba(47, 111, 228, 0.13);
+  --accent-border: rgba(47, 111, 228, 0.35);
+  --on-accent: #ffffff;
+  --danger: #d93a36;
+  --danger-soft: rgba(217, 58, 54, 0.12);
 
-  --shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.4);
-  --radius: 14px;
+  --border-subtle: rgba(15, 35, 70, 0.08);
+
+  --radius-pill: 999px;
+  --radius-panel: 22px;
+  --radius-row: 12px;
   --radius-sm: 8px;
 
   --width: 720px;
-  --search-height: 64px;
-  --row-height: 52px;
-  --results-max: 416px;
+  --control-height: 54px;
+  --gap: 10px;
+  --row-height: 48px;
+  --results-max: 400px;
 
   --ease: cubic-bezier(0.2, 0, 0, 1);
 
-  color-scheme: dark;
+  color-scheme: light;
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.4;
@@ -43,32 +50,32 @@
   text-rendering: optimizeLegibility;
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    --surface: rgba(250, 250, 252, 0.98);
-    --surface-solid: #fafafc;
-    --surface-raised: #ffffff;
-    --surface-hover: rgba(15, 23, 42, 0.04);
-    --surface-selected: rgba(59, 101, 230, 0.11);
-    --surface-chip: rgba(15, 23, 42, 0.05);
-    --overlay-scrim: rgba(245, 246, 250, 0.82);
+    --glass: rgba(34, 37, 46, 0.88);
+    --glass-solid: #23262f;
+    --glass-edge: rgba(255, 255, 255, 0.13);
+    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3);
 
-    --text: #151922;
-    --text-secondary: #5a6375;
-    --text-tertiary: #8a92a3;
+    --surface-hover: rgba(255, 255, 255, 0.06);
+    --surface-chip: rgba(255, 255, 255, 0.08);
+    --overlay-scrim: rgba(20, 22, 28, 0.72);
 
-    --accent: #3b65e6;
-    --accent-strong: #2f56d0;
-    --accent-soft: rgba(59, 101, 230, 0.1);
-    --accent-border: rgba(59, 101, 230, 0.3);
-    --danger: #d93a36;
-    --danger-soft: rgba(217, 58, 54, 0.1);
+    --text: #f1f3f8;
+    --text-secondary: #a7afc0;
+    --text-tertiary: #7c8496;
 
-    --border: rgba(15, 23, 42, 0.1);
-    --border-subtle: rgba(15, 23, 42, 0.06);
+    --accent: #4d8bff;
+    --accent-strong: #3a7af5;
+    --accent-soft: rgba(77, 139, 255, 0.18);
+    --accent-border: rgba(77, 139, 255, 0.4);
+    --danger: #ef5350;
+    --danger-soft: rgba(239, 83, 80, 0.16);
 
-    --shadow: 0 24px 60px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(15, 23, 42, 0.08);
-    color-scheme: light;
+    --border-subtle: rgba(255, 255, 255, 0.07);
+
+    color-scheme: dark;
   }
 }
 
@@ -93,7 +100,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 40px; /* Room for the panel shadow inside the OS window */
+  padding-top: 40px; /* Room for shadows inside the OS window */
   user-select: none;
 }
 
@@ -119,60 +126,72 @@ svg {
   display: none !important;
 }
 
-/* ── Panel ─────────────────────────────────────────────────────────────────── */
+/* The shared material for the capsule, the round buttons and the panel. */
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+}
+
+/* ── Layout ────────────────────────────────────────────────────────────────── */
 
 .container {
   position: relative;
   width: var(--width);
   display: flex;
   flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  overflow: hidden;
+  gap: var(--gap);
 }
 
-/* Overlays need room even when the panel is in its compact idle state. */
+/* Overlays need room even when only the search row is showing. */
 .container.overlay-open {
-  min-height: 460px;
+  min-height: 470px;
 }
 
-.container.empty-state .results,
-.container.empty-state .command-footer {
-  display: none;
-}
-
-/* A toast raised from the idle state (e.g. "Shortcut saved") still needs a home. */
-.container.empty-state .command-footer:has(.toast.visible) {
+.search-row {
   display: flex;
-  border-top-color: transparent;
+  align-items: center;
 }
 
-.container.empty-state .command-footer:has(.toast.visible) .footer-keys {
-  visibility: hidden;
-}
-
-/* ── Search bar ────────────────────────────────────────────────────────────── */
+/* ── Search capsule ────────────────────────────────────────────────────────── */
 
 .search-box {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: var(--search-height);
-  padding: 0 16px 0 20px;
-  flex-shrink: 0;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  height: var(--control-height);
+  padding: 0 22px 0 20px;
+  border-radius: calc(var(--control-height) / 2);
+  transition: border-radius 160ms var(--ease);
+}
+
+/* ── Joined card: once results show, the capsule and panel become one surface ─ */
+
+.container:not(.empty-state) {
+  gap: 0;
 }
 
 .container:not(.empty-state) .search-box {
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom-color: transparent;
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  box-shadow: var(--glass-highlight);
+}
+
+.container:not(.empty-state) .panel {
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+  /* Negative spread keeps the shadow from bleeding up onto the search bar. */
+  box-shadow: 0 22px 34px -10px rgba(0, 0, 0, 0.35);
+  animation: none;
 }
 
 .search-icon {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   stroke-width: 2.25;
 }
 
@@ -186,7 +205,7 @@ svg {
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 400;
   caret-color: var(--accent);
   user-select: text;
@@ -198,12 +217,12 @@ svg {
 
 .filter-tag {
   flex-shrink: 0;
-  padding: 3px 10px;
+  padding: 4px 12px;
   border: 1px solid var(--accent-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -214,65 +233,104 @@ svg {
   border-color: var(--accent);
 }
 
+/* ── Round filter buttons (fold away while typing) ─────────────────────────── */
+
 .idle-shortcuts {
   display: flex;
-  gap: 6px;
+  gap: var(--gap);
   flex-shrink: 0;
+  max-width: 260px;
+  margin-left: var(--gap);
+  overflow: visible;
+  transition: max-width 220ms var(--ease), margin-left 220ms var(--ease), opacity 160ms var(--ease);
 }
 
 .container.has-query .idle-shortcuts {
-  display: none;
+  max-width: 0;
+  margin-left: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .idle-shortcut {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: var(--control-height);
+  height: var(--control-height);
+  flex: 0 0 var(--control-height);
   padding: 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface-chip);
+  border-radius: 50%;
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background-color 120ms var(--ease), color 120ms var(--ease);
+  transition: color 120ms var(--ease), transform 120ms var(--ease), background-color 120ms var(--ease);
 }
 
 .idle-shortcut:hover {
-  background: var(--accent-soft);
   color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.idle-shortcut:active {
+  transform: scale(0.96);
 }
 
 .idle-shortcut svg {
-  width: 17px;
-  height: 17px;
+  width: 21px;
+  height: 21px;
   stroke-width: 1.8;
 }
 
-/* ── Results ───────────────────────────────────────────────────────────────── */
+/* ── Results panel ─────────────────────────────────────────────────────────── */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+  animation: drop 160ms var(--ease);
+}
+
+.container.empty-state .panel {
+  display: none;
+}
+
+/* A toast raised from the idle state (e.g. "Shortcut saved") still needs a home. */
+.container.empty-state .panel:has(.toast.visible) {
+  display: flex;
+}
+
+.container.empty-state .panel:has(.toast.visible) .command-footer {
+  border-top-color: transparent;
+}
+
+.container.empty-state .panel:has(.toast.visible) .footer-keys {
+  visibility: hidden;
+}
 
 .results {
   list-style: none;
   margin: 0;
-  padding: 6px;
+  padding: 6px 8px;
   max-height: var(--results-max);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--border-subtle) transparent;
 }
 
 .category-header {
   padding: 10px 12px 4px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .category-header:first-child {
-  padding-top: 4px;
+  padding-top: 6px;
 }
 
 .result-item {
@@ -280,13 +338,42 @@ svg {
   align-items: center;
   gap: 12px;
   min-height: var(--row-height);
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  border-radius: var(--radius-row);
   cursor: pointer;
 }
 
+.result-item:hover:not(.selected) {
+  background: var(--surface-hover);
+}
+
+/* Solid accent selection with inverted text. */
 .result-item.selected {
-  background: var(--surface-selected);
+  background: var(--accent-strong);
+  color: var(--on-accent);
+}
+
+.result-item.selected .app-name,
+.result-item.selected .app-subtitle,
+.result-item.selected .row-hint,
+.result-item.selected .row-action {
+  color: var(--on-accent);
+}
+
+.result-item.selected .app-subtitle,
+.result-item.selected .row-hint {
+  opacity: 0.85;
+}
+
+.result-item.selected .app-name mark {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.result-item.selected .app-icon.glyph {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--on-accent);
 }
 
 .app-icon {
@@ -294,7 +381,7 @@ svg {
   height: 30px;
   flex-shrink: 0;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: 7px;
 }
 
 .app-icon.glyph {
@@ -309,14 +396,30 @@ svg {
   height: 17px;
 }
 
-.app-icon.glyph.danger {
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-
 .app-icon.glyph.accent {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+/* The first result is presented larger as the "Top Hit". */
+.result-item.top-hit {
+  min-height: 60px;
+}
+
+.result-item.top-hit .app-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+}
+
+.result-item.top-hit .app-icon.glyph svg {
+  width: 21px;
+  height: 21px;
+}
+
+.result-item.top-hit .app-name {
+  font-size: 15.5px;
+  font-weight: 600;
 }
 
 .app-info {
@@ -352,7 +455,7 @@ svg {
 }
 
 .result-item.inline-result .app-name {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -380,7 +483,7 @@ svg {
   height: 28px;
   padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
@@ -388,7 +491,10 @@ svg {
 
 .row-action:hover {
   background: var(--surface-chip);
-  color: var(--text);
+}
+
+.result-item.selected .row-action:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .row-action svg {
@@ -406,7 +512,7 @@ svg {
 /* ── Notice (no results / naming mode) ─────────────────────────────────────── */
 
 .notice {
-  padding: 28px 24px 32px;
+  padding: 26px 24px 28px;
   text-align: center;
 }
 
@@ -441,7 +547,7 @@ svg {
   justify-content: space-between;
   gap: 12px;
   height: 36px;
-  padding: 0 14px;
+  padding: 0 16px;
   border-top: 1px solid var(--border-subtle);
   color: var(--text-tertiary);
   font-size: 12px;
@@ -474,7 +580,7 @@ svg {
   top: 50%;
   max-width: 60%;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 500;
@@ -504,7 +610,7 @@ kbd {
   display: inline-block;
   min-width: 20px;
   padding: 1px 5px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-subtle);
   border-bottom-width: 2px;
   border-radius: 5px;
   background: var(--surface-chip);
@@ -524,17 +630,30 @@ kbd {
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: var(--radius-panel);
   background: var(--overlay-scrim);
   animation: fade 140ms var(--ease);
+}
+
+/* The dialog floats over the desktop, so dim the launcher itself rather than
+   painting a scrim rectangle over empty space. */
+.dialog-overlay {
+  background: transparent;
+}
+
+.container:has(.dialog-overlay:not(.hidden)) :is(.search-row, .panel) {
+  opacity: 0.45;
+  filter: saturate(0.6);
+  transition: opacity 140ms var(--ease);
 }
 
 .dialog-box {
   width: 340px;
   padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-panel);
+  background: var(--glass-solid);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
   text-align: center;
   animation: pop 160ms var(--ease);
 }
@@ -542,8 +661,8 @@ kbd {
 .dialog-icon {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   margin: 0 auto 14px;
   border-radius: 50%;
   background: var(--accent-soft);
@@ -580,9 +699,9 @@ kbd {
 
 .btn {
   flex: 1;
-  height: 34px;
+  height: 36px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -591,7 +710,7 @@ kbd {
 
 .btn-primary {
   background: var(--accent-strong);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .btn-primary:hover {
@@ -603,8 +722,8 @@ kbd {
 }
 
 .btn-secondary {
-  border-color: var(--border);
-  background: transparent;
+  border-color: var(--border-subtle);
+  background: var(--surface-chip);
   color: var(--text-secondary);
 }
 
@@ -615,7 +734,9 @@ kbd {
 
 .help-overlay {
   align-items: stretch;
-  background: var(--surface-solid);
+  border: 1px solid var(--glass-edge);
+  background: var(--glass-solid);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
 }
 
 .help-content {
@@ -653,10 +774,8 @@ kbd {
 .help-section h4 {
   margin: 0 0 8px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .help-row {
@@ -686,6 +805,13 @@ kbd {
 @keyframes fade {
   from {
     opacity: 0;
+  }
+}
+
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
   }
 }
 

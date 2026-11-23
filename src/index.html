@@ -10,14 +10,15 @@
 
   <body>
     <main class="container empty-state" id="container">
-      <!-- Search -->
-      <div class="search-box">
+      <!-- Search row: capsule field + round filter buttons -->
+      <div class="search-row">
+      <div class="search-box glass">
         <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
         <button id="filter-tag" class="filter-tag hidden" type="button" title="Remove filter (Backspace)"></button>
         <input
           id="search-input"
           type="text"
-          placeholder="Search apps, files, and commands"
+          placeholder="Spotlight Search"
           autofocus
           autocomplete="off"
           spellcheck="false"
@@ -27,6 +28,7 @@
           aria-controls="results-list"
           aria-autocomplete="list"
         />
+      </div>
         <div class="idle-shortcuts" role="group" aria-label="Search filters">
           <button class="idle-shortcut" type="button" data-query="app:" aria-label="Search applications" title="Applications  (app:)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
           <button class="idle-shortcut" type="button" data-query="folder:" aria-label="Search folders" title="Folders  (folder:)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
@@ -35,7 +37,8 @@
         </div>
       </div>
 
-      <!-- Results -->
+      <!-- Results panel -->
+      <section class="panel glass">
       <ul id="results-list" class="results" role="listbox" aria-label="Results"></ul>
       <div id="notice" class="notice hidden" role="status" aria-live="polite">
         <p id="notice-title" class="notice-title"></p>
@@ -52,6 +55,7 @@
           <span class="footer-item"><kbd>F1</kbd> Help</span>
         </div>
       </footer>
+      </section>
 
       <!-- Confirm dialog -->
       <div id="confirm-dialog" class="overlay dialog-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby="dialog-message">

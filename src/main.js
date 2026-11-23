@@ -19,7 +19,7 @@ const FILTERS = {
   "command:": "Commands",
 };
 
-const DEFAULT_PLACEHOLDER = "Search apps, files, and commands";
+const DEFAULT_PLACEHOLDER = "Spotlight Search";
 const MAX_RESULTS = 20;
 const SEARCH_DELAY_MS = 45;
 const COMMAND_SEARCH_DELAY_MS = 150;
@@ -166,10 +166,27 @@ async function runSearch() {
   }
   if (queryId !== state.queryId || state.mode !== "search") return; // stale
 
-  state.results = results.slice(0, MAX_RESULTS);
+  state.results = groupByCategory(results.slice(0, MAX_RESULTS));
   state.selectedIndex = state.results.length ? 0 : -1;
   state.searchedTerm = term;
   render();
+}
+
+/**
+ * The backend returns rows in rank order, which can interleave categories
+ * (Folders, Documents, Folders…). Keep the top hit first, then gather the rest
+ * by category in order of each category's best-ranked row, so every section
+ * header appears once. Order within a category is preserved.
+ */
+function groupByCategory(results) {
+  if (results.length < 3) return results;
+  const [top, ...rest] = results;
+  const groups = new Map();
+  for (const item of rest) {
+    if (!groups.has(item.category)) groups.set(item.category, []);
+    groups.get(item.category).push(item);
+  }
+  return [top, ...[...groups.values()].flat()];
 }
 
 function scheduleSearch() {

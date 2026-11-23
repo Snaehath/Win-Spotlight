@@ -83,9 +83,12 @@ export function renderResults(list, results, selectedIndex, term) {
   let lastCategory = null;
 
   results.forEach((item, index) => {
-    if (item.category !== lastCategory) {
-      lastCategory = item.category;
-      html += `<li class="category-header" role="presentation">${escapeHtml(categoryTitle(item.category))}</li>`;
+    // The best match is lifted into its own "Top Hit" group; the rest stay
+    // grouped by category (so a second app still gets an "Applications" header).
+    const group = index === 0 ? "Top Hit" : categoryTitle(item.category);
+    if (group !== lastCategory) {
+      lastCategory = group;
+      html += `<li class="category-header" role="presentation">${escapeHtml(group)}</li>`;
     }
 
     const kind = itemKind(item);
@@ -93,6 +96,7 @@ export function renderResults(list, results, selectedIndex, term) {
     const actions = renderActions(item, kind);
     const label = CATEGORY_CONFIG[item.category]?.label ?? "";
     const classes = ["result-item"];
+    if (index === 0) classes.push("top-hit");
     if (index === selectedIndex) classes.push("selected");
     if (item.inline_display) classes.push("inline-result");
     if (actions) classes.push("has-actions");
