@@ -23,7 +23,6 @@ pub struct SpotlightSchema {
     pub f_path: Field,
     pub f_item_type: Field,
     pub f_category: Field,
-    pub f_icon: Field,
 }
 
 impl SpotlightSchema {
@@ -33,10 +32,12 @@ impl SpotlightSchema {
         let f_path      = sb.add_text_field("path", STRING | STORED);
         let f_item_type = sb.add_text_field("item_type", STRING | STORED);
         let f_category  = sb.add_text_field("category", STRING | STORED);
-        let f_icon      = sb.add_text_field("icon", STORED);
+        // Icons are not stored: results are materialised from the in-memory
+        // cache by path, so storing ~0.5 KB data URIs per document only bloated
+        // the index and slowed candidate retrieval.
         let schema = sb.build();
         SpotlightSchema {
-            schema, f_name, f_path, f_item_type, f_category, f_icon
+            schema, f_name, f_path, f_item_type, f_category
         }
     }
 }
@@ -98,53 +99,48 @@ impl IndexEngine {
         })
     }
 
-    pub fn upsert(&self, item: &SearchItem) -> tantivy::Result<()> {
+    fn make_doc(&self, item: &SearchItem) -> TantivyDocument {
         let s = &self.schema;
-        let writer = self.writer.lock().unwrap();
-
-        let path_term = Term::from_field_text(s.f_path, &item.path);
-        writer.delete_term(path_term);
-
         let item_type_str = match item.item_type {
             ItemType::App    => "app",
             ItemType::File   => "file",
             ItemType::Folder => "folder",
         };
-        let icon_val = item.icon.clone().unwrap_or_default();
-
-        let new_doc = doc!(
+        doc!(
             s.f_name => item.name.clone(),
             s.f_path => item.path.clone(),
             s.f_item_type => item_type_str,
             s.f_category => item.category.clone(),
-            s.f_icon => icon_val,
-        );
-        writer.add_document(new_doc)?;
+        )
+    }
+
+    pub fn upsert(&self, item: &SearchItem) -> tantivy::Result<()> {
+        let writer = self.writer.lock().unwrap();
+        writer.delete_term(Term::from_field_text(self.schema.f_path, &item.path));
+        writer.add_document(self.make_doc(item))?;
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn bulk_add(&self, items: &[SearchItem]) -> tantivy::Result<()> {
-        let s = &self.schema;
         let mut writer = self.writer.lock().unwrap();
         for item in items {
-            let path_term = Term::from_field_text(s.f_path, &item.path);
-            writer.delete_term(path_term);
+            writer.delete_term(Term::from_field_text(self.schema.f_path, &item.path));
+            writer.add_document(self.make_doc(item))?;
+        }
+        writer.commit()?;
+        drop(writer);
+        self.reader.reload()?;
+        Ok(())
+    }
 
-            let item_type_str = match item.item_type {
-                ItemType::App    => "app",
-                ItemType::File   => "file",
-                ItemType::Folder => "folder",
-            };
-            let icon_val = item.icon.clone().unwrap_or_default();
-
-            let new_doc = doc!(
-                s.f_name => item.name.clone(),
-                s.f_path => item.path.clone(),
-                s.f_item_type => item_type_str,
-                s.f_category => item.category.clone(),
-                s.f_icon => icon_val,
-            );
-            writer.add_document(new_doc)?;
+    /// Replace the whole index with `items` in one commit, so files deleted or
+    /// renamed while the app wasn't running don't linger as stale documents.
+    pub fn replace_all(&self, items: &[SearchItem]) -> tantivy::Result<()> {
+        let mut writer = self.writer.lock().unwrap();
+        writer.delete_all_documents()?;
+        for item in items {
+            writer.add_document(self.make_doc(item))?;
         }
         writer.commit()?;
         drop(writer);

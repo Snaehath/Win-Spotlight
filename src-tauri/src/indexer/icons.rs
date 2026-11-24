@@ -16,12 +16,12 @@ pub const ICON_AUDIO: &str = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDov
 pub fn get_file_category_and_icon(path: &Path) -> (String, Option<String>) {
     let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
     match ext.as_str() {
-        "pdf" | "doc" | "docx" | "txt" | "rtf" | "odt" | "md" | "markdown" => ("DOC".to_string(), Some(ICON_DOC.to_string())),
-        "xlsx" | "xls" | "csv" | "tsv" => ("XLS".to_string(), Some(ICON_XLS.to_string())),
-        "pptx" | "ppt" => ("PPT".to_string(), Some(ICON_PPT.to_string())),
-        "png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "bmp" | "ico" => ("IMG".to_string(), Some(ICON_IMG.to_string())),
-        "mp4" | "mkv" | "avi" | "mov" | "wmv" | "flv" | "webm" => ("VID".to_string(), Some(ICON_VID.to_string())),
-        "mp3" | "wav" | "flac" | "aac" | "ogg" | "m4a" | "wma" => ("AUDIO".to_string(), Some(ICON_AUDIO.to_string())),
+        "pdf" | "doc" | "docx" | "docm" | "dot" | "dotx" | "txt" | "rtf" | "odt" | "md" | "markdown" | "epub" | "log" | "xps" | "oxps" => ("DOC".to_string(), Some(ICON_DOC.to_string())),
+        "xlsx" | "xls" | "xlsm" | "xlsb" | "ods" | "csv" | "tsv" => ("XLS".to_string(), Some(ICON_XLS.to_string())),
+        "pptx" | "ppt" | "pptm" | "pps" | "ppsx" | "pot" | "potx" | "odp" | "key" => ("PPT".to_string(), Some(ICON_PPT.to_string())),
+        "png" | "jpg" | "jpeg" | "jfif" | "gif" | "svg" | "webp" | "bmp" | "ico" | "tif" | "tiff" | "heic" | "heif" | "avif" | "psd" | "raw" | "cr2" | "nef" | "dng" => ("IMG".to_string(), Some(ICON_IMG.to_string())),
+        "mp4" | "m4v" | "mkv" | "avi" | "mov" | "wmv" | "flv" | "webm" | "mpg" | "mpeg" | "3gp" => ("VID".to_string(), Some(ICON_VID.to_string())),
+        "mp3" | "wav" | "flac" | "aac" | "ogg" | "opus" | "m4a" | "wma" | "aiff" | "mid" | "midi" => ("AUDIO".to_string(), Some(ICON_AUDIO.to_string())),
         "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "iso" => ("ARCHIVE".to_string(), Some(ICON_ZIP.to_string())),
         "rs" | "js" | "ts" | "jsx" | "tsx" | "py" | "html" | "css" | "json" | "toml" | "yaml" | "yml" | "c" | "cpp" | "h" | "go" | "java" | "sql" | "sh" | "ps1" | "bat" => ("CODE".to_string(), Some(ICON_CODE.to_string())),
         _ => ("FILE".to_string(), Some(ICON_FILE.to_string())),

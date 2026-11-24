@@ -171,11 +171,10 @@ fn main() {
                 let engine_clone = engine.clone();
                 let initial_items = cache_arc.lock().unwrap().clone();
                 std::thread::spawn(move || {
-                    let num_docs = engine_clone.reader.searcher().num_docs();
-                    if num_docs == 0 || num_docs != initial_items.len() as u64 {
-                        let _ = engine_clone.bulk_add(&initial_items);
-                    }
-                    
+                    // Always rebuild from the fresh scan. Comparing document counts
+                    // missed renames and left deleted files in the index forever.
+                    let _ = engine_clone.replace_all(&initial_items);
+
                     // Run a disk vacuum on every boot to prune old tantivy cache
                     engine_clone.vacuum();
                 });
@@ -192,16 +191,18 @@ fn main() {
 
             // ── File watcher (background) ──────────────────────────────────
             {
-                // Get refined paths (Start Menu, Desktop, etc.) instead of raw drive roots
-                let watch_paths: Vec<String> = get_base_scan_paths()
+                // Start Menu, shared desktop and the user's own folders (Desktop,
+                // Downloads, Documents, …) so new files appear without a restart.
+                // Drive roots are never watched recursively: that was the main
+                // cause of high CPU. Drive roots have no parent component.
+                let mut watch_paths: Vec<String> = get_base_scan_paths()
                     .into_iter()
-                    .filter(|p: &std::path::PathBuf| {
-                        // Don't watch drive roots (e.g. "C:\") recursively!
-                        // That is the primary cause of high CPU. Drive roots have no parent component.
-                        p.parent().is_some() 
-                    })
+                    .chain(indexer::user_scan_dirs())
+                    .filter(|p: &std::path::PathBuf| p.parent().is_some())
                     .map(|p: std::path::PathBuf| p.to_string_lossy().to_string())
                     .collect();
+                watch_paths.sort_by_key(|p| p.to_lowercase());
+                watch_paths.dedup_by_key(|p| p.to_lowercase());
 
                 watcher::start_watcher(
                     engine.clone(),

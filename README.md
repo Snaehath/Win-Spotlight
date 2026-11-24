@@ -29,7 +29,7 @@ Spotlight-Win is a small native launcher that lives in your system tray. It find
 ## Features
 
 - **Instant app search.** Every installed app from the Start Menu, desktop shortcuts and Store app aliases. Duplicate shortcuts for the same app are merged into one result.
-- **Files and folders.** Searches the names of files and folders in Downloads, Documents, Pictures, Videos, Music, your desktop and your drives. Newly installed apps and desktop items appear within seconds, and everything else is rescanned each time the app starts.
+- **Files and folders.** Searches the names of files and folders anywhere in your Desktop, Downloads, Documents, Pictures, Videos and Music, including deep subfolders and OneDrive-redirected folders, plus the top levels of your other drives. Documents, images, slides, spreadsheets, audio, video, archives and code are all recognised. New files in your folders appear within seconds. Library folders such as `node_modules`, `site-packages` and `.git` are skipped to keep results clean.
 - **Results that learn.** Apps you open often, and at this time of day, rise to the top. The best match is shown as a **Top Hit**, and the rest are grouped by type.
 - **Typo-tolerant matching.** Prefix, acronym (`vsc` → Visual Studio Code) and fuzzy matching.
 - **Calculator.** Type `12*(3+4)` or `sqrt(144)` and the answer appears instantly. Press <kbd>Enter</kbd> to copy it.
@@ -93,7 +93,7 @@ To reset everything, quit the app from the tray and delete `%APPDATA%\com.spotli
 | Problem | Fix |
 | --- | --- |
 | *"The Ctrl+Space shortcut is already in use"* on start | Another copy of Spotlight-Win, or another app, owns the shortcut. Quit the other copy from the tray, or close the app that uses <kbd>Ctrl</kbd> + <kbd>Space</kbd>. |
-| A new file doesn't show up | Apps and desktop items are picked up within a few seconds. Files in other folders are found at the next start, so quit and reopen Spotlight-Win from the tray to rescan now. |
+| A file doesn't show up | Files in your user folders appear within a few seconds. Folders elsewhere on your drives are scanned a few levels deep at start-up. Files inside hidden folders (starting with `.`) and library folders (`node_modules`, `site-packages`, `build`, …) are skipped on purpose. |
 | An old item keeps ranking high | Select it and press <kbd>Alt</kbd> + <kbd>Enter</kbd> to forget its history. |
 
 ## Build from source

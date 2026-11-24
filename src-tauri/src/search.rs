@@ -212,9 +212,14 @@ pub fn search_items(
     let mut candidates: Vec<(i64, usize)> = Vec::with_capacity(64);
     let mut candidate_seen: HashSet<usize> = HashSet::with_capacity(64);
 
-    // 3.1 Retrieve candidates from Tantivy inverted index
-    let tantivy_candidates = index_state.0.search_candidates(actual_query, 64);
-    for (cand_path, tantivy_score) in tantivy_candidates {
+    // 3.1 Retrieve candidates from Tantivy inverted index.
+    // Word-prefix regex queries are constant-score, so Tantivy's top-N is in
+    // arbitrary order. Pull a generous pool and rank it ourselves below;
+    // with only 64, a common word ("readme", "report") could drop the file
+    // the user wanted before ranking ever saw it.
+    const TANTIVY_POOL: usize = 400;
+    let tantivy_candidates = index_state.0.search_candidates(actual_query, TANTIVY_POOL);
+    for (cand_path, _tantivy_score) in tantivy_candidates {
         if let Some(&idx) = path_lookup.get(&cand_path) {
             let item = &items[idx];
             if let Some(cat) = forced_category {
@@ -224,14 +229,20 @@ pub fn search_items(
                 if item.item_type != *itype { continue; }
             }
 
-            let is_exact = item.normalized_name == query_lower;
+            let is_exact = item.normalized_name == query_lower
+                || (item.item_type == crate::indexer::ItemType::File
+                    && file_stem_lower(&item.normalized_name) == query_lower);
             let is_prefix = item.normalized_name.starts_with(&query_lower);
+            // Every Tantivy hit already matches each query word as a word prefix
+            // ("rep" → "Annual Report.pptx"). That must rank *below* a name that
+            // starts with the query; previously it scored 1000 per word, above
+            // the 700 given to true prefixes.
             let mut score = if is_exact {
                 1200
             } else if is_prefix {
                 700
             } else {
-                tantivy_score
+                450
             };
             if item.category == "APP" {
                 score += 150;
@@ -339,6 +350,15 @@ pub fn search_items(
     // Combine: command suggestions first (pinned at top of COMMAND section)
     command_results.append(&mut file_results);
     command_results
+}
+
+/// "quarterly report.pptx" → "quarterly report", so typing a file's name without
+/// its extension counts as an exact match.
+fn file_stem_lower(name_lower: &str) -> &str {
+    match name_lower.rfind('.') {
+        Some(dot) if dot > 0 => &name_lower[..dot],
+        _ => name_lower,
+    }
 }
 
 // ── Ambient Intent Detection ──────────────────────────────────────────────────

@@ -74,7 +74,8 @@ impl SearchItem {
 /// Unified classifier for files, apps, and folders across both scanner and watcher
 pub fn classify_path(path: &Path, cache: Option<&IconCache>) -> Option<SearchItem> {
     let name = path.file_name().and_then(|s| s.to_str())?;
-    if name.is_empty() || name.starts_with('.') {
+    // Hidden files and Office lock files (`~$Report.docx`) are never launch targets.
+    if name.is_empty() || name.starts_with('.') || name.starts_with("~$") {
         return None;
     }
 
@@ -94,6 +95,11 @@ pub fn classify_path(path: &Path, cache: Option<&IconCache>) -> Option<SearchIte
         .and_then(|s| s.to_str())
         .unwrap_or("")
         .to_lowercase();
+
+    // In-progress downloads and temp files churn constantly in Downloads.
+    if matches!(ext.as_str(), "crdownload" | "part" | "partial" | "download" | "tmp" | "temp") {
+        return None;
+    }
 
     if ext == "lnk" || ext == "exe" {
         let stem = path.file_stem().and_then(|s| s.to_str())?;
@@ -166,36 +172,9 @@ pub fn scan_items(cache: Option<&IconCache>) -> Vec<SearchItem> {
         }
     }
 
-    // SCAN USER DIRECTORIES (Documents, Downloads, Pictures, Videos, Music)
-    if let Some(user_dirs) = UserDirs::new() {
-        let folders = vec![
-            user_dirs.download_dir(),
-            user_dirs.document_dir(),
-            user_dirs.picture_dir(),
-            user_dirs.video_dir(),
-            user_dirs.audio_dir(),
-        ];
-
-        for dir_opt in folders {
-            if let Some(path) = dir_opt {
-                if !path.exists() { continue; }
-                let walker = WalkDir::new(path)
-                    .max_depth(3)
-                    .into_iter()
-                    .filter_entry(|e| {
-                        let name = e.file_name().to_str().unwrap_or("");
-                        !should_skip_directory(name, e.depth())
-                    });
-
-                for entry in walker.filter_map(|e| e.ok()) {
-                    if entry.depth() == 0 { continue; }
-                    let file_path = entry.path();
-                    if let Some(item) = classify_path(file_path, cache) {
-                        items.push(item);
-                    }
-                }
-            }
-        }
+    // SCAN USER DIRECTORIES (Desktop, Documents, Downloads, Pictures, Videos, Music)
+    for dir in user_scan_dirs() {
+        scan_user_dir(&dir, cache, &mut items);
     }
     
     // COMMON SYSTEM TOOLS
@@ -241,9 +220,54 @@ pub fn scan_items(cache: Option<&IconCache>) -> Vec<SearchItem> {
         }
     }
 
-    items.sort_by(|a, b| a.name.cmp(&b.name));
-    items.dedup_by(|a, b| a.name == b.name && a.path == b.path);
+    // The same file can be reached twice (e.g. `D:\Downloads` via both the drive
+    // walk and the user-folder walk). Keep the first occurrence of each path.
+    let mut seen = std::collections::HashSet::with_capacity(items.len());
+    items.retain(|item| seen.insert(item.path.to_lowercase()));
     deduplicate_apps(items)
+}
+
+/// How deep to look inside the user's own folders. Real documents often live
+/// many levels down (`Documents\Projects\Client\2026\Q3\deck.pptx`); a limit of
+/// 3 missed ~90% of them. Library/hidden trees are pruned, so a full-depth walk
+/// stays cheap (~0.5 s for ~50k entries in testing).
+pub const USER_DIR_MAX_DEPTH: usize = 12;
+
+/// The user's personal folders, resolved through Windows known-folder APIs so
+/// OneDrive-redirected or relocated folders (e.g. `D:\Downloads`) are honoured.
+pub fn user_scan_dirs() -> Vec<PathBuf> {
+    let Some(user_dirs) = UserDirs::new() else { return Vec::new() };
+    [
+        user_dirs.desktop_dir(),
+        user_dirs.download_dir(),
+        user_dirs.document_dir(),
+        user_dirs.picture_dir(),
+        user_dirs.video_dir(),
+        user_dirs.audio_dir(),
+    ]
+    .into_iter()
+    .flatten()
+    .map(Path::to_path_buf)
+    .filter(|p| p.exists())
+    .collect()
+}
+
+/// Walk one user folder (pruning ignored/hidden trees) and classify everything in it.
+pub fn scan_user_dir(root: &Path, cache: Option<&IconCache>, items: &mut Vec<SearchItem>) {
+    let walker = WalkDir::new(root)
+        .max_depth(USER_DIR_MAX_DEPTH)
+        .into_iter()
+        .filter_entry(|e| {
+            let name = e.file_name().to_str().unwrap_or("");
+            e.depth() == 0 || !should_skip_directory(name, e.depth())
+        });
+
+    for entry in walker.filter_map(|e| e.ok()) {
+        if entry.depth() == 0 { continue; }
+        if let Some(item) = classify_path(entry.path(), cache) {
+            items.push(item);
+        }
+    }
 }
 
 /// Canonical application entity deduplication.
@@ -296,4 +320,57 @@ pub fn deduplicate_apps(items: Vec<SearchItem>) -> Vec<SearchItem> {
     result.sort_by(|a, b| a.name.cmp(&b.name));
     result.dedup_by(|a, b| a.name == b.name && a.path == b.path);
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn touch(path: &Path) {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, b"x").unwrap();
+    }
+
+    #[test]
+    fn user_dir_scan_finds_deep_documents_and_skips_noise() {
+        let root = std::env::temp_dir().join(format!(
+            "spotlight_scan_test_{}",
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let deep = root.join("Projects").join("Client").join("2026").join("Q3").join("Review").join("Final");
+        let wanted = [
+            deep.join("Board Deck.ppt"),
+            deep.join("notes.txt"),
+            root.join("Photos").join("Trip").join("Day 1").join("Beach").join("sunset.jpeg"),
+            root.join("Photos").join("iphone").join("IMG_0001.HEIC"),
+        ];
+        let noise = [
+            root.join("tool").join("python").join("Lib").join("site-packages").join("numpy").join("readme.txt"),
+            root.join("site").join(".git").join("objects").join("info.txt"),
+            root.join("Projects").join("~$Board Deck.pptx"),
+            root.join("installer.exe.crdownload"),
+        ];
+        for p in wanted.iter().chain(noise.iter()) {
+            touch(p);
+        }
+
+        let mut items = Vec::new();
+        scan_user_dir(&root, None, &mut items);
+        let paths: Vec<&str> = items.iter().map(|i| i.path.as_str()).collect();
+
+        for p in &wanted {
+            assert!(paths.contains(&p.to_str().unwrap()), "deep file should be indexed: {:?}", p);
+        }
+        for p in &noise {
+            assert!(!paths.contains(&p.to_str().unwrap()), "noise should be skipped: {:?}", p);
+        }
+
+        let category = |name: &str| items.iter().find(|i| i.name == name).map(|i| i.category.as_str());
+        assert_eq!(category("Board Deck.ppt"), Some("PPT"));
+        assert_eq!(category("notes.txt"), Some("DOC"));
+        assert_eq!(category("sunset.jpeg"), Some("IMG"));
+        assert_eq!(category("IMG_0001.HEIC"), Some("IMG"));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

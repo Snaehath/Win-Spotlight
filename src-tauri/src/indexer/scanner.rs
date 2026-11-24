@@ -22,17 +22,15 @@ pub fn get_base_scan_paths() -> Vec<PathBuf> {
     let mut base_paths: Vec<PathBuf> = Vec::new();
     let system_drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string());
 
-    // 1. Standard Locations (Start Menu, Desktop)
+    // 1. Standard Locations (Start Menu, shared desktop).
+    // The user's own Desktop is covered by `user_scan_dirs()`, which resolves
+    // OneDrive-redirected desktops that a hard-coded `%USERPROFILE%\Desktop` misses.
     if let Ok(appdata) = std::env::var("APPDATA") {
         base_paths.push(PathBuf::from(appdata).join("Microsoft\\Windows\\Start Menu\\Programs"));
     }
-    
+
     base_paths.push(PathBuf::from(format!("{}\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs", system_drive)));
-    
-    if let Ok(userprofile) = std::env::var("USERPROFILE") {
-        base_paths.push(PathBuf::from(userprofile).join("Desktop"));
-    }
-    
+
     base_paths.push(PathBuf::from(format!("{}\\Users\\Public\\Desktop", system_drive)));
     
     if let Ok(local_appdata) = std::env::var("LOCALAPPDATA") {
@@ -80,13 +78,28 @@ pub fn is_ignored_dir_name(name: &str) -> bool {
             | "system volume information"
             | "perflogs"
             | "config.msi"
+            // Package/library trees: tens of thousands of files nobody searches for
+            // (one portable Python install alone contributed 46k files in testing).
+            | "site-packages"
+            | "dist-packages"
+            | "__pypackages__"
+            | "venv"
+            | "virtualenv"
+            | "bower_components"
+            | "jspm_packages"
     )
+}
+
+/// Hidden/tooling directories (`.git`, `.venv`, `.gradle`, …) never hold files
+/// people launch from a search bar.
+fn is_hidden_dir_name(name: &str) -> bool {
+    name.len() > 1 && name.starts_with('.')
 }
 
 pub fn is_ignored_path(path: &std::path::Path) -> bool {
     path.components().any(|c| {
         let s = c.as_os_str().to_str().unwrap_or("");
-        is_ignored_dir_name(s) || s.starts_with('$')
+        is_ignored_dir_name(s) || s.starts_with('$') || is_hidden_dir_name(s)
     })
 }
 
@@ -107,6 +120,6 @@ pub fn should_skip_directory(name: &str, depth: usize) -> bool {
     ) {
         return true;
     }
-    
-    is_ignored_dir_name(name)
+
+    is_ignored_dir_name(name) || is_hidden_dir_name(name)
 }
